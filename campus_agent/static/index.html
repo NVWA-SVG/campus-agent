@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Campus Agent：支持课程查询、Agentic RAG、只读校园业务 API 和 DeepSeek 规划的校园事务助手"
+    />
+    <title>Campus Agent · 校园事务智能助手</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="page-glow page-glow-one" aria-hidden="true"></div>
+    <div class="page-glow page-glow-two" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Campus Agent 首页">
+        <span class="brand-mark">CA</span>
+        <span>
+          <strong>Campus Agent</strong>
+          <small>校园事务智能助手</small>
+        </span>
+      </a>
+
+      <div class="topbar-status" aria-label="系统状态">
+        <span class="status-pill status-online">
+          <i></i>
+          服务正常
+        </span>
+        <span class="status-pill" id="model-status">正在检查模型配置…</span>
+        <button class="knowledge-button" id="knowledge-button" type="button">
+          <span aria-hidden="true">＋</span>
+          管理知识库
+        </button>
+        <a class="api-doc-link" href="/docs" target="_blank" rel="noreferrer">
+          API 文档
+        </a>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="side-panel controls-panel">
+        <section>
+          <div class="section-heading">
+            <span class="eyebrow">运行方式</span>
+            <span class="tiny-badge">可切换</span>
+          </div>
+          <div class="planner-switch" role="group" aria-label="选择规划器">
+            <button class="planner-option active" data-planner="rule" type="button">
+              <span class="planner-icon">R</span>
+              <span>
+                <strong>规则规划器</strong>
+                <small>不调用大模型 · 稳定可复现</small>
+              </span>
+              <i class="selection-dot"></i>
+            </button>
+            <button class="planner-option" data-planner="deepseek" type="button">
+              <span class="planner-icon planner-icon-ai">AI</span>
+              <span>
+                <strong>DeepSeek</strong>
+                <small>智能规划 · 失败自动降级</small>
+              </span>
+              <i class="selection-dot"></i>
+            </button>
+          </div>
+          <div class="network-note" id="network-note">
+            <span class="network-icon">⌁</span>
+            <p>
+              <strong>默认使用本地 Mock</strong>
+              <span>规则规划器不调用大模型；业务状态会明确标注数据来源。</span>
+            </p>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-heading">
+            <span class="eyebrow">试试这样问</span>
+          </div>
+          <div class="example-list">
+            <button class="example-question" type="button">
+              <span>01</span>
+              周三有什么课程？
+            </button>
+            <button class="example-question" type="button">
+              <span>02</span>
+              校园卡丢了怎么补办？
+            </button>
+            <button class="example-question featured" type="button">
+              <span>03</span>
+              校园卡丢了怎么办，服务中心现在开门吗？
+            </button>
+          </div>
+        </section>
+
+        <section class="capability-section">
+          <div class="section-heading">
+            <span class="eyebrow">能力边界</span>
+          </div>
+          <ul class="capability-list">
+            <li><i>✓</i>课程与教室查询</li>
+            <li><i>✓</i>可上传资料知识库 RAG</li>
+            <li><i>✓</i>多工具任务编排</li>
+            <li><i>✓</i>只读校园业务 API</li>
+            <li><i>✓</i>SQLite 持久会话</li>
+          </ul>
+        </section>
+
+        <section class="evaluation-card" aria-label="RAG 固定评测结果">
+          <div>
+            <span class="eyebrow">RAG 固定评测集</span>
+            <strong>100 条用例 · BGE Hybrid</strong>
+          </div>
+          <dl>
+            <div><dt>Hit@1</dt><dd>94.67%</dd></div>
+            <div><dt>Recall@3</dt><dd>98.67%</dd></div>
+            <div><dt>安全拒答</dt><dd>100%</dd></div>
+            <div><dt>No-hit</dt><dd>80%</dd></div>
+          </dl>
+        </section>
+      </aside>
+
+      <section class="chat-panel" aria-label="Campus Agent 对话">
+        <header class="chat-header">
+          <div>
+            <span class="assistant-avatar">CA</span>
+            <span>
+              <strong>校园事务助手</strong>
+              <small id="chat-mode-label">规则模式 · 本地运行</small>
+            </span>
+          </div>
+          <button class="ghost-button" id="clear-button" type="button">
+            清空会话
+          </button>
+        </header>
+
+        <div class="message-list" id="message-list" role="log" aria-live="polite"></div>
+
+        <div class="suggestion-row" id="suggestion-row">
+          <button type="button">人工智能导论在哪里上？</button>
+          <button type="button">怎么在图书馆借书？</button>
+        </div>
+
+        <form class="composer" id="chat-form">
+          <label class="sr-only" for="message-input">输入校园事务问题</label>
+          <textarea
+            id="message-input"
+            maxlength="2000"
+            rows="1"
+            placeholder="输入校园事务问题，Enter 发送，Shift + Enter 换行"
+          ></textarea>
+          <div class="composer-footer">
+            <span id="input-hint">本地课程数据 + 可上传知识库</span>
+            <button class="send-button" id="send-button" type="submit">
+              <span>发送</span>
+              <b aria-hidden="true">↑</b>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <aside class="side-panel inspector-panel">
+        <section class="inspector-section trace-section">
+          <div class="section-heading inspector-heading">
+            <div>
+              <span class="eyebrow">执行轨迹</span>
+              <small>Plan → Retrieve → Grade → Verify</small>
+            </div>
+            <span class="live-badge"><i></i> Trace</span>
+          </div>
+          <div class="empty-state" id="trace-empty">
+            <span class="empty-icon">⌘</span>
+            <strong>等待第一次任务</strong>
+            <p>Agent 的规划、工具调用和最终回答会显示在这里。</p>
+          </div>
+          <ol class="trace-list" id="trace-list" hidden></ol>
+        </section>
+
+        <section class="inspector-section metrics-section">
+          <div class="section-heading inspector-heading">
+            <div>
+              <span class="eyebrow">运行指标</span>
+              <small id="metric-caption">当前规划器累计数据</small>
+            </div>
+            <span class="request-time" id="request-time">— ms</span>
+          </div>
+          <div class="metric-grid">
+            <article>
+              <span>API Calls</span>
+              <strong id="metric-calls">0</strong>
+            </article>
+            <article>
+              <span>Tokens</span>
+              <strong id="metric-tokens">0</strong>
+            </article>
+            <article>
+              <span>Retries</span>
+              <strong id="metric-retries">0</strong>
+            </article>
+            <article>
+              <span>Fallbacks</span>
+              <strong id="metric-fallbacks">0</strong>
+            </article>
+          </div>
+        </section>
+
+        <section class="data-boundary">
+          <div class="boundary-icon">◎</div>
+          <div>
+            <strong>数据边界清晰</strong>
+            <p>
+              页面只访问本机 API；仅在 DeepSeek 模式且配置密钥时，由后端请求模型接口。
+            </p>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <dialog class="knowledge-dialog" id="knowledge-dialog" aria-labelledby="knowledge-title">
+      <div class="knowledge-dialog-shell">
+        <header class="knowledge-dialog-header">
+          <div>
+            <span class="eyebrow">Local RAG Workspace</span>
+            <h2 id="knowledge-title">知识库管理</h2>
+            <p>上传资料后会在本机解析并立即进入 Rule 与 DeepSeek 共用的检索索引。</p>
+          </div>
+          <button
+            class="dialog-close"
+            id="knowledge-close"
+            type="button"
+            aria-label="关闭知识库管理"
+          >
+            ×
+          </button>
+        </header>
+
+        <section class="knowledge-stats" aria-label="知识库统计">
+          <article>
+            <span>内置资料</span>
+            <strong id="knowledge-built-in-count">—</strong>
+          </article>
+          <article>
+            <span>已上传</span>
+            <strong id="knowledge-uploaded-count">—</strong>
+          </article>
+          <article>
+            <span>检索片段</span>
+            <strong id="knowledge-chunk-count">—</strong>
+          </article>
+          <article>
+            <span>索引版本</span>
+            <strong id="knowledge-index-version">—</strong>
+          </article>
+        </section>
+
+        <div class="knowledge-grid">
+          <section class="knowledge-upload-panel">
+            <div class="knowledge-section-title">
+              <div>
+                <span class="eyebrow">01 · Import</span>
+                <h3>导入学习资料</h3>
+              </div>
+            </div>
+            <form id="knowledge-upload-form">
+              <label class="upload-dropzone" id="knowledge-dropzone" for="knowledge-file">
+                <span class="upload-icon" aria-hidden="true">↑</span>
+                <strong>点击选择或拖入文件</strong>
+                <small>支持 UTF-8 Markdown、TXT 与可提取文字的 PDF，单文件不超过 10 MiB</small>
+                <span class="selected-file" id="knowledge-selected-file">尚未选择文件</span>
+              </label>
+              <input
+                class="sr-only"
+                id="knowledge-file"
+                name="knowledge-file"
+                type="file"
+                accept=".md,.txt,.pdf,text/markdown,text/plain,application/pdf"
+              />
+              <button class="knowledge-primary-button" id="knowledge-upload-button" type="submit">
+                上传并更新索引
+              </button>
+            </form>
+
+            <div class="knowledge-boundary-note">
+              <span aria-hidden="true">◎</span>
+              <p>
+                <strong>本地优先</strong>
+                <small>
+                  原始文件不会上传到 DeepSeek。仅当选择 DeepSeek 模式提问时，命中的资料片段才会作为模型上下文由 Python 后端发送。
+                </small>
+              </p>
+            </div>
+          </section>
+
+          <section class="knowledge-document-panel">
+            <div class="knowledge-section-title knowledge-list-heading">
+              <div>
+                <span class="eyebrow">02 · Documents</span>
+                <h3>已上传资料</h3>
+              </div>
+              <button class="knowledge-secondary-button" id="knowledge-rebuild-button" type="button">
+                重建索引
+              </button>
+            </div>
+            <div class="knowledge-feedback" id="knowledge-feedback" aria-live="polite"></div>
+            <div class="knowledge-document-list" id="knowledge-document-list">
+              <div class="knowledge-list-empty">正在读取知识库…</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
+    <template id="message-template">
+      <article class="message">
+        <div class="message-avatar"></div>
+        <div class="message-content">
+          <div class="message-meta"></div>
+          <div class="message-bubble"></div>
+        </div>
+      </article>
+    </template>
+
+    <script src="/assets/app.js" type="module"></script>
+  </body>
+</html>

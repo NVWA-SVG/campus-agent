@@ -1,0 +1,229 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-08-29T13:24:11+00:00",
+  "split": "dev",
+  "dataset": {
+    "case_count": 68,
+    "sha256": "107837200c9a6a931cd514075725b9e23a8ba918c1cc1054bf394381002cffa9"
+  },
+  "embedding": {
+    "provider": "sentence-transformers",
+    "model": "BAAI/bge-small-zh-v1.5",
+    "revision": "7999e1d3359715c523056ef9478215996d62a620",
+    "fingerprint": "d7346f499033af67",
+    "device": "cpu",
+    "runtime_versions": {
+      "numpy": "2.5.1",
+      "python": "3.12.4",
+      "sentence-transformers": "5.5.1",
+      "torch": "2.12.0",
+      "transformers": "5.10.2"
+    },
+    "runtime_metadata": {
+      "device": "cpu",
+      "versions": {
+        "python": "3.12.4",
+        "sentence-transformers": "5.5.1",
+        "transformers": "5.10.2",
+        "torch": "2.12.0",
+        "numpy": "2.5.1"
+      }
+    },
+    "query_prompt": "为这个句子生成表示以用于检索相关文章：",
+    "normalize_embeddings": true
+  },
+  "vector_status": "ready",
+  "thresholds": [
+    0.44,
+    0.46,
+    0.48,
+    0.5,
+    0.52,
+    0.55,
+    0.6
+  ],
+  "recommendation": {
+    "recommended_threshold": 0.48,
+    "production_gate_passed": false,
+    "mode": "best_observed_gate_not_met",
+    "minimum_no_hit_accuracy": 0.9,
+    "rule": "先筛选 Hybrid No-hit Accuracy 达到门槛的阈值；再依次最大化 Hybrid Hit@3、Hit@1、No-hit Accuracy，最小化 FPR，完全并列时选择更高阈值。若没有阈值通过门槛，只报告最佳观测值并标记非生产就绪。"
+  },
+  "rows": [
+    {
+      "threshold": 0.44,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.96,
+          "hit_at_3": 1.0,
+          "recall_at_3": 1.0,
+          "mrr_at_3": 0.98,
+          "no_hit_accuracy": 0.5,
+          "false_positive_rate": 0.5,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 2
+        },
+        "hybrid": {
+          "hit_at_1": 0.92,
+          "hit_at_3": 1.0,
+          "recall_at_3": 1.0,
+          "mrr_at_3": 0.96,
+          "no_hit_accuracy": 0.5,
+          "false_positive_rate": 0.5,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.46,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.94,
+          "hit_at_3": 0.98,
+          "recall_at_3": 0.98,
+          "mrr_at_3": 0.96,
+          "no_hit_accuracy": 0.5,
+          "false_positive_rate": 0.5,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 3
+        },
+        "hybrid": {
+          "hit_at_1": 0.92,
+          "hit_at_3": 1.0,
+          "recall_at_3": 1.0,
+          "mrr_at_3": 0.96,
+          "no_hit_accuracy": 0.5,
+          "false_positive_rate": 0.5,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.48,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.9,
+          "hit_at_3": 0.94,
+          "recall_at_3": 0.94,
+          "mrr_at_3": 0.92,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 4
+        },
+        "hybrid": {
+          "hit_at_1": 0.92,
+          "hit_at_3": 0.98,
+          "recall_at_3": 0.98,
+          "mrr_at_3": 0.95,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 2
+        }
+      }
+    },
+    {
+      "threshold": 0.5,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.86,
+          "hit_at_3": 0.9,
+          "recall_at_3": 0.9,
+          "mrr_at_3": 0.88,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 6
+        },
+        "hybrid": {
+          "hit_at_1": 0.9,
+          "hit_at_3": 0.96,
+          "recall_at_3": 0.96,
+          "mrr_at_3": 0.93,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 3
+        }
+      }
+    },
+    {
+      "threshold": 0.52,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.76,
+          "hit_at_3": 0.8,
+          "recall_at_3": 0.8,
+          "mrr_at_3": 0.78,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 11
+        },
+        "hybrid": {
+          "hit_at_1": 0.88,
+          "hit_at_3": 0.94,
+          "recall_at_3": 0.94,
+          "mrr_at_3": 0.91,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 4
+        }
+      }
+    },
+    {
+      "threshold": 0.55,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.76,
+          "hit_at_3": 0.8,
+          "recall_at_3": 0.8,
+          "mrr_at_3": 0.78,
+          "no_hit_accuracy": 1.0,
+          "false_positive_rate": 0.0,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 10
+        },
+        "hybrid": {
+          "hit_at_1": 0.88,
+          "hit_at_3": 0.94,
+          "recall_at_3": 0.94,
+          "mrr_at_3": 0.91,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 4
+        }
+      }
+    },
+    {
+      "threshold": 0.6,
+      "strategies": {
+        "vector": {
+          "hit_at_1": 0.54,
+          "hit_at_3": 0.58,
+          "recall_at_3": 0.58,
+          "mrr_at_3": 0.56,
+          "no_hit_accuracy": 1.0,
+          "false_positive_rate": 0.0,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 21
+        },
+        "hybrid": {
+          "hit_at_1": 0.88,
+          "hit_at_3": 0.92,
+          "recall_at_3": 0.92,
+          "mrr_at_3": 0.9,
+          "no_hit_accuracy": 0.75,
+          "false_positive_rate": 0.25,
+          "hard_negative_safe_abstention_rate": 1.0,
+          "failed_cases": 5
+        }
+      }
+    }
+  ]
+}

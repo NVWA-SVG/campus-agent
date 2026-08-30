@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campus-agent.local/schema/evaluation-case-v1.json",
+  "title": "Campus Agent Evaluation Case v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "schema_version", "task", "split", "query", "request", "expected", "tags", "difficulty", "review_status"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "schema_version": {"const": "1.0"},
+    "task": {"enum": ["retrieval", "agentic"]},
+    "split": {"enum": ["dev", "test"]},
+    "query": {"type": "string", "minLength": 1},
+    "request": {"type": "object", "additionalProperties": false, "properties": {"top_k": {"type": "integer", "minimum": 1, "maximum": 20}, "filters": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1}}}},
+    "expected": {"type": "object", "additionalProperties": false, "required": ["answerable", "relevant_document_ids", "relevant_chunk_ids", "required_facts", "forbidden_facts"], "properties": {"answerable": {"type": "boolean"}, "relevant_document_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "relevant_chunk_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "domain": {"type": ["string", "null"]}, "category": {"type": ["string", "null"]}, "required_facts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}, "forbidden_facts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+    "tags": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "difficulty": {"enum": ["easy", "medium", "hard"]},
+    "review_status": {"const": "human_checked"},
+    "retrieval_expectation": {"enum": ["hit", "no_hit", "topic_hit_allowed"]},
+    "agentic": {"type": "object", "additionalProperties": false, "properties": {"rewrite_expected": {"enum": [true, false, "if_initial_insufficient", null]}, "rewritten_query_contains": {"type": "array", "items": {"type": "string", "minLength": 1}}, "grade_expected": {"enum": ["relevant", "insufficient", null]}, "verification_expected": {"enum": ["grounded", "insufficient_evidence", "unsupported", null]}, "max_retrieval_attempts": {"type": "integer", "minimum": 1, "maximum": 2}, "required_events": {"type": "array", "items": {"type": "string", "minLength": 1}}, "forbidden_tools": {"type": "array", "items": {"type": "string", "minLength": 1}}}}
+  },
+  "allOf": [{"if": {"properties": {"task": {"const": "agentic"}}}, "then": {"required": ["agentic"]}, "else": {"not": {"required": ["agentic"]}}}]
+}

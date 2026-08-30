@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "campus-agent"
+version = "0.9.0"
+description = "基于LangGraph、Agentic RAG与SQLite Checkpoint的校园事务Agent"
+requires-python = ">=3.11"
+dependencies = [
+    "anyio>=4,<5",
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+    "langchain>=1.0,<2",
+    "langgraph>=1.2,<2",
+    "langgraph-checkpoint-sqlite>=3.1,<4",
+    "numpy>=1.26,<3",
+    "pypdf>=5,<7",
+    "uvicorn>=0.34,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+semantic = ["sentence-transformers>=5,<6"]
+
+[project.scripts]
+campus-agent = "campus_agent.cli:main"
+campus-agent-langchain-demo = "campus_agent.langchain_demo:main"
+campus-agent-web = "campus_agent.web:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["campus_agent*"]
+
+[tool.setuptools.package-data]
+campus_agent = ["static/*", "data/knowledge/*.md"]

@@ -1,0 +1,2 @@
+"""Campus Agent tests."""
+

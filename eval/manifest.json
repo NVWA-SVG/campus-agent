@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "description": "Campus Agent 可复现离线评测集",
+  "case_count": 100,
+  "files": {
+    "retrieval_positive.v1.jsonl": 60,
+    "retrieval_negative.v1.jsonl": 20,
+    "metadata.v1.jsonl": 10,
+    "agentic.v1.jsonl": 10
+  },
+  "split_policy": "dev用于阈值和融合权重调整，test冻结用于回归；每类约70/30。",
+  "ground_truth_policy": "可回答用例必须绑定当前语料中真实存在的document_id和chunk_id；retrieval_no_hit要求零命中；missing_fact允许召回主题资料但必须安全拒答缺失事实。",
+  "metrics": ["Hit@1", "Hit@3", "Document Hit@3", "Recall@3", "MRR@3", "No-hit Accuracy", "False Positive Rate", "Hard-negative Safe Abstention", "Filter Leakage Rate", "Required Fact Coverage"],
+  "limitations": "离线Runner不是完整生产Graph，因此Prompt Injection只记录not_evaluated；权限边界由独立Graph测试覆盖。当前严格no-hit仅5条，冻结test中仅1条。"
+}

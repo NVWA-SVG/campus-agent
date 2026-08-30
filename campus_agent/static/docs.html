@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Campus Agent · API 文档</title>
+    <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body class="docs-body">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="返回 Campus Agent">
+        <span class="brand-mark">CA</span>
+        <span>
+          <strong>Campus Agent API</strong>
+          <small>完全本地的接口说明</small>
+        </span>
+      </a>
+      <div class="topbar-status">
+        <span class="status-pill status-online"><i></i>无需外部 CDN</span>
+        <a class="api-doc-link" href="/openapi.json">OpenAPI JSON</a>
+        <a class="api-doc-link" href="/">返回工作台</a>
+      </div>
+    </header>
+
+    <main class="docs-page">
+      <section class="docs-hero">
+        <span class="eyebrow">HTTP API · v0.9.0</span>
+        <h1>Campus Agent 接口</h1>
+        <p>
+          浏览器与 Agent 核心之间的本地接口。API Key 不属于任何请求字段，只能由后端环境变量读取。
+        </p>
+      </section>
+
+      <section class="endpoint-list">
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-get">GET</span>
+            <code>/api/health</code>
+          </div>
+          <p>
+            返回服务状态、DeepSeek 配置、知识库与向量缓存统计、校园业务 API 模式和当前页面会话使用的 CSRF Token，不返回任何 API Key、Token 或上游地址。
+          </p>
+        </article>
+
+        <article class="endpoint-card endpoint-featured">
+          <div class="endpoint-title">
+            <span class="method method-post">POST</span>
+            <code>/api/chat</code>
+          </div>
+          <p>非流式兼容接口，返回回答、结构化引用、执行轨迹、指标和耗时。可选 filters 支持 metadata 过滤。</p>
+          <pre><code>{
+  "query": "周三有什么课程？",
+  "session_id": "web-demo-1",
+  "planner": "rule"
+}</code></pre>
+        </article>
+
+        <article class="endpoint-card endpoint-featured">
+          <div class="endpoint-title">
+            <span class="method method-post">POST</span>
+            <code>/api/chat/stream</code>
+          </div>
+          <p>
+            网页默认使用的 POST SSE 接口。依次发送白名单化 trace 事件、完整 result 与 done；不会原样暴露 Graph State、文档正文或工具内部数据。
+          </p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-get">GET</span>
+            <code>/api/history?session_id=web-demo-1</code>
+          </div>
+          <p>从 LangGraph SQLite Checkpoint 读取指定会话的用户与 Agent 消息，服务重启后仍保留。</p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-delete">DELETE</span>
+            <code>/api/history?session_id=web-demo-1</code>
+          </div>
+          <p>删除指定 SQLite thread，其他会话不会受到影响。</p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-get">GET</span>
+            <code>/api/metrics?planner=deepseek</code>
+          </div>
+          <p>返回调用次数、Token、重试、延迟与规则降级指标。</p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-get">GET</span>
+            <code>/api/knowledge/documents</code>
+          </div>
+          <p>列出用户已上传资料及索引统计，不返回磁盘路径和文档正文。</p>
+        </article>
+
+        <article class="endpoint-card endpoint-featured">
+          <div class="endpoint-title">
+            <span class="method method-post">POST</span>
+            <code>/api/knowledge/documents?filename=guide.md&amp;domain=policy&amp;category=guide&amp;version=2026.1</code>
+          </div>
+          <p>
+            以原始请求体上传 Markdown、TXT 或 PDF，可登记 domain、category 和 version；解析成功后原子更新 Rule 与 DeepSeek 共用的本地索引。最大 10 MiB。
+          </p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-delete">DELETE</span>
+            <code>/api/knowledge/documents/{document_id}</code>
+          </div>
+          <p>永久删除指定上传资料，并在成功重建索引后提交删除。</p>
+        </article>
+
+        <article class="endpoint-card">
+          <div class="endpoint-title">
+            <span class="method method-post">POST</span>
+            <code>/api/knowledge/rebuild</code>
+          </div>
+          <p>重新读取内置资料与上传资料，构造并原子替换 BM25 + Vector + RRF 混合索引快照。</p>
+        </article>
+      </section>
+
+      <section class="docs-note">
+        <strong>写请求与网络边界</strong>
+        <p>
+          所有 POST 与 DELETE 接口都必须携带从 <code>/api/health</code> 取得的
+          <code>X-CSRF-Token</code>。规则模式不调用大模型；Mock 业务接口完全本地，Official 模式仅由 Python 后端访问固定的获授权 HTTPS 接口。Embedding 运行期只读取本地模型缓存，下载必须通过单独的准备命令显式执行。选择 DeepSeek 且后端配置有效 Key 时会请求模型 API。本页和工作台均不加载第三方脚本、字体或样式。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
