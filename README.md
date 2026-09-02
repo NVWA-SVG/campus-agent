@@ -1,8 +1,19 @@
 # Campus Agent
 
-一个面向校内办事与课程查询场景的可运行 Agent 项目。当前主链路使用 LangGraph 编排，具备多工具调用、Agentic RAG、混合检索、结构化引用、答案验证、SQLite 会话持久化、网页实时 Trace，以及可替换的只读校园业务 API。
+一个面向高校学生的校园事务智能助手，也是用于学习和展示企业级 Agent 工程链路的完整项目。它把课程查询、校园办事知识和实时业务状态统一到一个网页工作台，由 LangGraph 负责任务规划、工具路由、Agentic RAG、答案验证和会话提交。
 
-项目默认使用本地 Rule、Hashing Embedding 和明确标记的 Mock 业务数据，不联网。DeepSeek 与获授权的 Official 校园业务 API 都必须显式配置；Embedding 模型只能通过独立准备命令主动下载，Web/CLI 运行期固定为 local-only。项目不使用 Dify，也不会搜索或抓取普通网页。
+项目默认使用本地 Rule、Hashing Embedding 和明确标记的 Mock 业务数据，不联网。可选接入 DeepSeek、真实中文 BGE Embedding、LangSmith Trace，以及获得授权的校园只读业务 API；所有网络能力均需显式配置。项目不使用 Dify，也不会搜索或抓取普通网页。
+
+![Campus Agent Web 工作台](docs/web-ui-preview.png)
+
+| 维度 | 当前实现 |
+|---|---|
+| 工作流 | LangGraph StateGraph，Plan → Tool → Grade/Rewrite → Compose → Verify → Commit |
+| 检索 | BM25 + BGE Vector + Weighted RRF，metadata 过滤与结构化 Citation |
+| 模型 | 本地 Rule 默认运行；DeepSeek Planner/Composer 可选且失败安全回退 |
+| 服务 | FastAPI + 原生 Web + POST SSE Trace + SQLite Checkpoint |
+| 业务集成 | Mock/Official 可替换只读校园 API，TTL/Stale/Singleflight 缓存 |
+| 质量保障 | 179 项自动化测试、28 个 subtests、100 条版本化离线评测用例 |
 
 ## 当前能力
 
@@ -76,6 +87,8 @@ Offline Evaluation
   └─ 100条固定JSONL → BM25 / Vector / Hybrid → JSONL + Markdown报告
 ```
 
+更适合阅读和面试讲解的图形版本：[`Campus-Agent流程图.pdf`](docs/Campus-Agent流程图.pdf)；可编辑源文件：[`campus-agent-flow-diagrams.html`](docs/campus-agent-flow-diagrams.html)。
+
 所有生产入口都经过相同的 LangGraph 拓扑。Rule 与 DeepSeek 是两个同构的编译 runtime，不是假装成同一个实例；它们共享 Saver/thread 与同一个知识索引。`campus_agent/agent.py` 只是稳定兼容层，实际图定义位于 `campus_agent/graph/`。
 
 ### LangChain 在哪里
@@ -113,6 +126,36 @@ python -m campus_agent.web
 http://127.0.0.1:8000
 ```
 
+### Windows 一键启动
+
+安装好虚拟环境并准备好 BGE 模型后，可以直接双击项目根目录的：
+
+```text
+start-campus-agent.cmd
+```
+
+启动器会使用 `.venv` 中的 Python，设置本地 BGE、local-only 和 Mock 业务 API，等待健康检查通过后自动打开 `http://127.0.0.1:8000`。它不会保存或主动设置 DeepSeek Key，但会继承启动终端已有的环境变量；需要 DeepSeek 时，应在同一个终端预先设置 `DEEPSEEK_API_KEY`。
+
+同一可信局域网内临时演示：
+
+```powershell
+.\start-campus-agent.cmd lan
+ipconfig
+```
+
+让对方连接同一 Wi-Fi，并访问 `http://你的IPv4地址:8000`。Windows 防火墙询问时只允许“专用网络”。默认本机模式监听 `127.0.0.1`；`lan` 模式才监听 `0.0.0.0`。
+
+启动器会把检测到的本机 IPv4 加入 `CAMPUS_WEB_ALLOWED_HOSTS`。手动使用反向代理或正式域名时，必须显式登记浏览器实际访问的 Host，例如：
+
+```powershell
+$env:CAMPUS_WEB_ALLOWED_HOSTS="127.0.0.1,localhost,campus.example.com"
+.\start-campus-agent.cmd
+```
+
+只填写域名或 IPv4，不要包含 `https://`、端口或路径；为了防止 Host Header 攻击，配置不接受全局通配符 `*`。
+
+当前知识库上传、删除、重建接口没有用户登录鉴权，因此不要把 `lan` 模式直接映射到公网。GitHub Pages 只能托管静态文件，不能运行本项目的 Python/FastAPI 后端。正式分享应把应用部署到支持 Python 的服务器或容器，并至少补充登录鉴权、HTTPS、请求限流、持久卷和服务端 Secret 管理；临时外网演示可使用带身份访问策略的正式 Cloudflare Tunnel，将服务地址指向 `http://localhost:8000`，同时把公网域名加入 `CAMPUS_WEB_ALLOWED_HOSTS`。Cloudflare Quick Tunnel 不支持 SSE，不适合当前网页的流式聊天接口。
+
 可以尝试：
 
 ```text
@@ -136,6 +179,21 @@ python -m campus_agent.web
 ```
 
 没有设置 `DEEPSEEK_API_KEY` 时，选择 DeepSeek 也不会发起网络请求，而是本地回退 Rule Planner。Key 只存在于 Python 后端模型客户端，不进入 Graph State、SQLite、HTML、JavaScript、浏览器存储或 API 响应。
+
+## LangSmith 调试（可选）
+
+当前生产主链是真实的 LangGraph `StateGraph`，因此可以直接打开基础 LangSmith Trace，查看节点顺序、分支、输入输出、耗时和异常：
+
+```powershell
+$env:LANGSMITH_TRACING="true"
+$env:LANGSMITH_API_KEY="你的LangSmith API Key"
+$env:LANGSMITH_PROJECT="campus-agent-dev"
+.\start-campus-agent.cmd
+```
+
+随后在 LangSmith 的 `campus-agent-dev` Project 中查看 `plan`、`execute_tools`、`grade_documents`、`rewrite_query`、`compose`、`verify_answer` 和 `commit_turn` 等节点。当前 DeepSeek 客户端、ToolRegistry 和 Hybrid Retriever 是自定义 Python 实现，尚未使用 `@traceable` 拆成独立的 LLM/Tool/Retriever 子 Span，因此准确表述是“支持 LangGraph 基础追踪”，不是“已经完成全链路细粒度可观测性”。
+
+Trace 可能包含用户问题、节点状态、工具结果和命中的知识片段，不要在开启追踪时提交个人隐私或未获授权的校内资料。关闭当前 PowerShell 或移除上述三个环境变量即可停用上报。
 
 ## 向量检索配置
 
@@ -277,6 +335,8 @@ python -m scripts.validate_eval_dataset
 python -m scripts.evaluate_rag --output-dir eval\reports\hashing-v1
 node --check campus_agent/static/app.js
 ```
+
+当前完整测试结果为 `179 passed, 28 subtests passed`；评测数据校验结果为 `100 cases valid`。
 
 自动化测试覆盖：
 

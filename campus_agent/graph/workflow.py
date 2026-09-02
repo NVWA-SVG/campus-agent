@@ -228,8 +228,10 @@ class CampusGraphAgent:
             assert self._memory is not None
             return self._memory.get(session_id)
         snapshot = self._graph.get_state(self._thread_config(session_id))
+        # SQLite checkpoint 保存的是 MessagePayload；公开接口始终返回统一的
+        # Message 领域对象，使调用方无需关心底层使用内存还是 SQLite。
         return tuple(
-            Message(role=message["role"], content=message["content"])
+            Message.from_dict(message)
             for message in snapshot.values.get("history", [])
         )
 
@@ -286,8 +288,10 @@ class CampusGraphAgent:
         }
         if self._checkpointer is None:
             assert self._memory is not None
+            # 没有 checkpointer 时，先把内存中的领域对象转成和 SQLite 路径
+            # 完全相同的 Graph State 结构，避免两种运行模式产生不同语义。
             state["history"] = [
-                {"role": message.role, "content": message.content}
+                message.as_dict()
                 for message in self._memory.get(session_id)
             ]
         return state

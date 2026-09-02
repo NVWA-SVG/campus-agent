@@ -6,14 +6,19 @@ from typing import Annotated, NotRequired, TypedDict
 
 from langgraph.channels import UntrackedValue
 
+from campus_agent.domain import MessagePayload
+
 
 class CampusGraphState(TypedDict):
-    # 只有 history 是持久状态。其余字段都是一次回合的工作区：即使节点异常
+    # 只有 history 是跨回合持久状态。MessagePayload 保证它始终是可序列化的
+    # user/assistant 字典，而不是依赖具体 Python 类的内存对象。
+    #
+    # 其余字段通过 UntrackedValue 标记为一次回合的临时工作区：即使节点异常
     # 或 SSE 被客户端中断，也不会把问题、工具输出或知识正文写入 checkpoint。
     query: Annotated[str, UntrackedValue]
     session_id: Annotated[str, UntrackedValue]
     planner_mode: Annotated[str, UntrackedValue]
-    history: list[dict[str, str]]
+    history: list[MessagePayload]
     events: Annotated[list[dict[str, str]], UntrackedValue]
     plan_summary: NotRequired[Annotated[str, UntrackedValue]]
     direct_answer: NotRequired[Annotated[str | None, UntrackedValue]]

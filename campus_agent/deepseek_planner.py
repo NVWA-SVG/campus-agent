@@ -95,8 +95,13 @@ class DeepSeekPlanner:
 
         request_context = {
             "user_query": query,
+            # 历史不是作为 DeepSeek API 的独立 role 消息原样重放，而是作为
+            # 不可信 JSON 上下文交给 Planner；逐条截断可限制 Prompt 体积。
             "recent_history": [
-                {"role": message.role, "content": message.content[:500]}
+                {
+                    **message.as_dict(),
+                    "content": message.content[:500],
+                }
                 for message in history[-8:]
             ],
             "available_tools": list(tool_descriptions),

@@ -15,7 +15,11 @@ from campus_agent.deepseek_planner import DeepSeekPlanner
 from campus_agent.memory import ConversationMemory
 from campus_agent.rag.knowledge_base import KnowledgeBaseService
 from campus_agent.tools import CampusKnowledgeTool
-from campus_agent.web import WebAgentService, create_app
+from campus_agent.web import (
+    WebAgentService,
+    create_app,
+    trusted_web_hosts_from_environment,
+)
 
 
 class WebApiTests(unittest.TestCase):
@@ -76,6 +80,33 @@ class WebApiTests(unittest.TestCase):
         self.assertNotIn("cdn.", docs.text)
         self.assertEqual(self.client.get("/openapi.json").status_code, 200)
         self.assertIn("connect-src 'self'", response.headers["content-security-policy"])
+
+    def test_web_allowed_hosts_are_explicit_and_reject_global_wildcard(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"CAMPUS_WEB_ALLOWED_HOSTS": "127.0.0.1,192.168.1.8,campus.example.com"},
+        ):
+            self.assertEqual(
+                trusted_web_hosts_from_environment(),
+                ["127.0.0.1", "192.168.1.8", "campus.example.com"],
+            )
+
+        with patch.dict(os.environ, {"CAMPUS_WEB_ALLOWED_HOSTS": "*"}):
+            with self.assertRaisesRegex(ValueError, "通配符"):
+                trusted_web_hosts_from_environment()
+
+    def test_configured_lan_host_is_accepted_and_unknown_host_is_rejected(self) -> None:
+        with patch.dict(
+            os.environ,
+            {"CAMPUS_WEB_ALLOWED_HOSTS": "testserver,192.168.1.8"},
+        ):
+            client = TestClient(create_app(self.client.app.state.agent_service))
+            self.addCleanup(client.close)
+            accepted = client.get("/api/health", headers={"host": "192.168.1.8:8000"})
+            rejected = client.get("/api/health", headers={"host": "evil.example.com"})
+
+        self.assertEqual(accepted.status_code, 200)
+        self.assertEqual(rejected.status_code, 400)
 
     def test_rule_chat_returns_answer_trace_and_metrics(self) -> None:
         response = self.client.post(

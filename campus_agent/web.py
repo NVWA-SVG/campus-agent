@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import secrets
 import sqlite3
@@ -56,6 +57,42 @@ from campus_agent.tools import CampusKnowledgeTool, CampusServiceStatusTool
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+DEFAULT_WEB_ALLOWED_HOSTS = ("127.0.0.1", "localhost", "testserver")
+WEB_HOST_LABEL_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
+
+
+def trusted_web_hosts_from_environment() -> list[str]:
+    """Return an explicit TrustedHost allowlist without permitting a global wildcard."""
+
+    raw_hosts = os.environ.get("CAMPUS_WEB_ALLOWED_HOSTS", "").strip()
+    if not raw_hosts:
+        return list(DEFAULT_WEB_ALLOWED_HOSTS)
+
+    allowed_hosts: list[str] = []
+    for raw_host in raw_hosts.split(","):
+        host = raw_host.strip().lower()
+        if not host:
+            continue
+        if host == "*":
+            raise ValueError("CAMPUS_WEB_ALLOWED_HOSTS 不允许使用全局通配符 *")
+
+        hostname = host[2:] if host.startswith("*.") else host
+        labels = hostname.split(".")
+        if (
+            len(hostname) > 253
+            or not labels
+            or any(not WEB_HOST_LABEL_PATTERN.fullmatch(label) for label in labels)
+        ):
+            raise ValueError(
+                "CAMPUS_WEB_ALLOWED_HOSTS 只能包含逗号分隔的 IPv4 或域名，"
+                "不能包含协议、端口或路径"
+            )
+        if host not in allowed_hosts:
+            allowed_hosts.append(host)
+
+    if not allowed_hosts:
+        raise ValueError("CAMPUS_WEB_ALLOWED_HOSTS 至少需要一个有效 Host")
+    return allowed_hosts
 
 
 class KnowledgeFilterRequest(BaseModel):
@@ -346,10 +383,8 @@ class WebAgentService:
         except sqlite3.Error as error:
             self._record_checkpoint_error(error)
             raise HTTPException(status_code=503, detail="会话存储暂不可用") from error
-        return [
-            {"role": message.role, "content": message.content}
-            for message in messages
-        ]
+        # Web 边界只返回基础字典，不把内部 dataclass 或 LangGraph 对象泄露给前端。
+        return [message.as_dict() for message in messages]
 
     def clear(self, session_id: str) -> None:
         validated = _validated_session_id(session_id)
@@ -578,7 +613,7 @@ def create_app(service: WebAgentService | None = None) -> FastAPI:
     app.state.agent_service = service
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["127.0.0.1", "localhost", "testserver"],
+        allowed_hosts=trusted_web_hosts_from_environment(),
     )
     app.mount("/assets", StaticFiles(directory=STATIC_DIR), name="assets")
 

@@ -16,8 +16,10 @@ KNOWLEDGE_TOOL_NAME = "search_campus_knowledge"
 
 
 def _history_messages(state: CampusGraphState) -> tuple[Message, ...]:
+    """把 checkpoint 中的基础字典恢复成经过校验的领域消息。"""
+
     return tuple(
-        Message(role=message["role"], content=message["content"])
+        Message.from_dict(message)
         for message in state.get("history", [])
     )
 
@@ -423,10 +425,12 @@ def build_commit_turn_node(
                 user_message,
                 assistant_message,
             )
+        # Graph State/Checkpoint 只保存 JSON 友好的 MessagePayload，不保存
+        # Message 实例；读取时统一通过 Message.from_dict() 恢复并校验。
         history = [
             *state.get("history", []),
-            {"role": user_message.role, "content": user_message.content},
-            {"role": assistant_message.role, "content": assistant_message.content},
+            user_message.as_dict(),
+            assistant_message.as_dict(),
         ][-max_history_messages:]
         return {
             "answer": answer,

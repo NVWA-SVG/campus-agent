@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>Campus Agent 流程图</title>
+  <style>
+    @page { size: A4 landscape; margin: 9mm; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; color: #172033; }
+    body { font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; }
+    .page { width: 279mm; height: 192mm; page-break-after: always; overflow: hidden; }
+    .page:last-child { page-break-after: auto; }
+    h1 { margin: 0 0 2mm; font-size: 21px; font-weight: 700; letter-spacing: .2px; }
+    .subtitle { margin: 0 0 3mm; color: #526078; font-size: 10px; }
+    svg { width: 100%; height: 174mm; display: block; }
+    svg text { font-family: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif; fill: #172033; }
+    .title { font-size: 19px; font-weight: 700; }
+    .participant { font-size: 13px; font-weight: 700; text-anchor: middle; }
+    .label { font-size: 11px; text-anchor: middle; }
+    .small { font-size: 9.5px; }
+    .node-title { font-size: 13px; font-weight: 700; text-anchor: middle; }
+    .node-sub { font-size: 9.5px; text-anchor: middle; fill: #526078; }
+    .edge { fill: none; stroke: #334155; stroke-width: 1.8; marker-end: url(#arrow); }
+    .edge-dashed { fill: none; stroke: #64748b; stroke-width: 1.6; stroke-dasharray: 6 5; marker-end: url(#arrowMuted); }
+    .lifeline { stroke: #8a98ad; stroke-width: 1.25; stroke-dasharray: 5 5; }
+    .footer { font-size: 8.5px; fill: #64748b; }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <h1>图 1　Campus Agent 调用时序图（Web + DeepSeek 模式）</h1>
+    <p class="subtitle">示例问题：“校园卡丢了怎么办，服务中心现在开门吗？”　模型负责规划，LangGraph 负责执行和路由，工具负责提供事实。</p>
+    <svg viewBox="0 0 1500 860" role="img" aria-label="Campus Agent 调用时序图">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#334155"/></marker>
+        <marker id="arrowMuted" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#64748b"/></marker>
+      </defs>
+
+      <!-- Participants -->
+      <g>
+        <rect x="22" y="18" width="126" height="46" rx="9" fill="#e8eefc" stroke="#46628f" stroke-width="1.6"/>
+        <text x="85" y="46" class="participant">用户</text>
+        <rect x="193" y="18" width="144" height="46" rx="9" fill="#e9f8f4" stroke="#3b826d" stroke-width="1.6"/>
+        <text x="265" y="46" class="participant">Web / FastAPI</text>
+        <rect x="390" y="18" width="160" height="46" rx="9" fill="#eee9ff" stroke="#6e55a4" stroke-width="1.6"/>
+        <text x="470" y="46" class="participant">LangGraph Agent</text>
+        <rect x="599" y="18" width="146" height="46" rx="9" fill="#fff4d8" stroke="#9a752b" stroke-width="1.6"/>
+        <text x="672" y="46" class="participant">ToolRegistry</text>
+        <rect x="800" y="18" width="130" height="46" rx="9" fill="#e6f5e8" stroke="#4c8452" stroke-width="1.6"/>
+        <text x="865" y="46" class="participant">DeepSeek</text>
+        <rect x="987" y="18" width="136" height="46" rx="9" fill="#fff0e6" stroke="#a66438" stroke-width="1.6"/>
+        <text x="1055" y="46" class="participant">校园工具</text>
+        <rect x="1173" y="18" width="138" height="46" rx="9" fill="#e7f6fb" stroke="#3f7d91" stroke-width="1.6"/>
+        <text x="1242" y="39" class="participant">质量控制</text>
+        <text x="1242" y="55" class="small" text-anchor="middle">Grade / Verify</text>
+        <rect x="1363" y="18" width="114" height="46" rx="9" fill="#f2f3f5" stroke="#667085" stroke-width="1.6"/>
+        <text x="1420" y="39" class="participant">SQLite</text>
+        <text x="1420" y="55" class="small" text-anchor="middle">Checkpoint</text>
+      </g>
+
+      <!-- Lifelines -->
+      <g>
+        <line x1="85" y1="64" x2="85" y2="818" class="lifeline"/>
+        <line x1="265" y1="64" x2="265" y2="818" class="lifeline"/>
+        <line x1="470" y1="64" x2="470" y2="818" class="lifeline"/>
+        <line x1="672" y1="64" x2="672" y2="818" class="lifeline"/>
+        <line x1="865" y1="64" x2="865" y2="818" class="lifeline"/>
+        <line x1="1055" y1="64" x2="1055" y2="818" class="lifeline"/>
+        <line x1="1242" y1="64" x2="1242" y2="818" class="lifeline"/>
+        <line x1="1420" y1="64" x2="1420" y2="818" class="lifeline"/>
+      </g>
+
+      <!-- Request and tool discovery -->
+      <line x1="85" y1="96" x2="265" y2="96" class="edge"/>
+      <text x="175" y="88" class="label">1. 提交问题</text>
+      <line x1="265" y1="132" x2="470" y2="132" class="edge"/>
+      <text x="367" y="124" class="label">2. stream(query, session_id)</text>
+      <line x1="470" y1="170" x2="672" y2="170" class="edge"/>
+      <text x="571" y="162" class="label">3. descriptions()</text>
+      <line x1="672" y1="207" x2="470" y2="207" class="edge-dashed"/>
+      <text x="571" y="197" class="label">工具名 + 描述 + 参数 Schema</text>
+
+      <rect x="534" y="222" width="274" height="68" rx="8" fill="#fff8dc" stroke="#c89c2d" stroke-width="1.2"/>
+      <text x="550" y="243" class="small" font-weight="700">当前 Web 工具白名单</text>
+      <text x="550" y="260" class="small">• query_courses</text>
+      <text x="550" y="276" class="small">• search_campus_knowledge</text>
+      <text x="676" y="260" class="small">• query_campus_service_status</text>
+
+      <!-- Planning -->
+      <line x1="470" y1="316" x2="865" y2="316" class="edge"/>
+      <text x="667" y="306" class="label">4. Prompt + 问题 + 历史 + available_tools</text>
+      <line x1="865" y1="354" x2="470" y2="354" class="edge-dashed"/>
+      <text x="667" y="344" class="label">5. JSON Plan：选择工具并生成参数</text>
+      <rect x="402" y="368" width="136" height="44" rx="7" fill="#f5f1ff" stroke="#8b72bd"/>
+      <text x="470" y="387" class="small" text-anchor="middle" font-weight="700">本地安全校验</text>
+      <text x="470" y="402" class="small" text-anchor="middle">工具名 / 参数 / 数量</text>
+
+      <!-- Tool execution -->
+      <line x1="470" y1="438" x2="672" y2="438" class="edge"/>
+      <text x="571" y="428" class="label">6. execute(tool_calls)</text>
+      <line x1="672" y1="475" x2="1055" y2="475" class="edge"/>
+      <text x="864" y="465" class="label">7. 调用课程 / RAG / 业务 API</text>
+      <line x1="1055" y1="512" x2="672" y2="512" class="edge-dashed"/>
+      <text x="864" y="502" class="label">ToolOutput：文本 + 数据 + Citations</text>
+      <line x1="672" y1="548" x2="470" y2="548" class="edge-dashed"/>
+      <text x="571" y="538" class="label">8. ToolResult</text>
+
+      <!-- Agentic RAG quality loop -->
+      <rect x="436" y="570" width="842" height="103" rx="9" fill="#eef9fc" stroke="#5794a7" stroke-width="1.2" stroke-dasharray="5 4"/>
+      <text x="448" y="589" class="small" font-weight="700">知识检索分支（最多两轮）</text>
+      <line x1="470" y1="615" x2="1242" y2="615" class="edge"/>
+      <text x="856" y="605" class="label">9. Grade：文档是否与问题相关？</text>
+      <path d="M1242 648 H1100 V660 H672 V638" class="edge-dashed"/>
+      <text x="962" y="653" class="label">不足时 Rewrite → 重新检索 → 再次 Grade</text>
+
+      <!-- Compose, verify, persist, response -->
+      <line x1="470" y1="704" x2="865" y2="704" class="edge"/>
+      <text x="667" y="694" class="label">10. 原问题 + 工具结果，请生成最终回答</text>
+      <line x1="865" y1="737" x2="470" y2="737" class="edge-dashed"/>
+      <text x="667" y="727" class="label">11. JSON Answer</text>
+      <line x1="470" y1="770" x2="1242" y2="770" class="edge"/>
+      <text x="856" y="760" class="label">12. Verify：事实是否有工具证据</text>
+      <line x1="1242" y1="798" x2="470" y2="798" class="edge-dashed"/>
+      <text x="856" y="789" class="label">grounded；否则回退工具原文</text>
+
+      <line x1="470" y1="823" x2="1420" y2="823" class="edge"/>
+      <text x="945" y="814" class="label">13. 原子保存会话</text>
+      <path d="M470 837 H265" class="edge-dashed"/>
+      <text x="367" y="830" class="label">14. SSE轨迹 + 答案 + 引用</text>
+      <path d="M265 850 H85" class="edge-dashed"/>
+      <text x="175" y="843" class="label">15. 展示最终结果</text>
+    </svg>
+  </section>
+
+  <section class="page">
+    <h1>图 2　Campus Agent 的 LangGraph 内部工作流</h1>
+    <p class="subtitle">Rule 与 DeepSeek 使用同一张状态图；区别只在 Planner/Composer，节点路由、工具执行、RAG 质量控制和会话提交保持一致。</p>
+    <svg viewBox="0 0 1500 860" role="img" aria-label="Campus Agent LangGraph 工作流图">
+      <defs>
+        <marker id="arrow2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#334155"/></marker>
+      </defs>
+
+      <!-- helper styles are inline because marker differs per SVG -->
+      <g fill="none" stroke="#334155" stroke-width="2" marker-end="url(#arrow2)">
+        <path d="M750 65 V100"/>
+        <path d="M750 160 V192"/>
+        <path d="M650 237 H310 V280"/>
+        <path d="M850 237 H1095 V280"/>
+        <path d="M310 342 V752 H1095 V776"/>
+        <path d="M1095 342 V370"/>
+        <path d="M990 415 H835 V462"/>
+        <path d="M1200 415 H1280 V462"/>
+        <path d="M1280 524 V550"/>
+        <path d="M1170 595 H880 V493 H835"/>
+        <path d="M1280 640 V653 H1155"/>
+        <path d="M1040 622 V550 H740 V524"/>
+        <path d="M1155 653 H1165"/>
+        <path d="M1395 653 H1440 V493 H1395"/>
+        <path d="M740 524 V690"/>
+        <path d="M750 750 V772"/>
+        <path d="M645 803 H495"/>
+        <path d="M855 803 H1005"/>
+        <path d="M422 830 V846 H1095 V830"/>
+        <path d="M1185 803 H1280"/>
+      </g>
+
+      <!-- Start and plan -->
+      <ellipse cx="750" cy="40" rx="72" ry="25" fill="#e8eefc" stroke="#46628f" stroke-width="1.8"/>
+      <text x="750" y="45" class="node-title">START</text>
+
+      <rect x="635" y="100" width="230" height="60" rx="10" fill="#eee9ff" stroke="#6e55a4" stroke-width="1.8"/>
+      <text x="750" y="124" class="node-title">plan</text>
+      <text x="750" y="145" class="node-sub">读取历史，生成 Plan / ToolCall</text>
+
+      <polygon points="750,192 850,237 750,282 650,237" fill="#fff4d8" stroke="#9a752b" stroke-width="1.8"/>
+      <text x="750" y="232" class="node-title">direct_answer?</text>
+      <text x="750" y="250" class="node-sub">是否无需工具</text>
+      <text x="500" y="225" class="small" fill="#526078">是</text>
+      <text x="966" y="225" class="small" fill="#526078">否</text>
+
+      <!-- Direct branch -->
+      <rect x="205" y="280" width="210" height="62" rx="10" fill="#f4f0ff" stroke="#8065af" stroke-width="1.8"/>
+      <text x="310" y="305" class="node-title">direct_answer</text>
+      <text x="310" y="326" class="node-sub">澄清问题或能力边界回答</text>
+
+      <!-- Tool branch -->
+      <rect x="970" y="280" width="250" height="62" rx="10" fill="#fff0e6" stroke="#a66438" stroke-width="1.8"/>
+      <text x="1095" y="305" class="node-title">execute_tools</text>
+      <text x="1095" y="326" class="node-sub">ToolRegistry 执行白名单工具</text>
+
+      <polygon points="1095,370 1200,415 1095,460 990,415" fill="#fff4d8" stroke="#9a752b" stroke-width="1.8"/>
+      <text x="1095" y="410" class="node-title">包含知识检索?</text>
+      <text x="1095" y="429" class="node-sub">retrieval_attempts &gt; 0</text>
+      <text x="900" y="404" class="small">否</text>
+      <text x="1242" y="404" class="small">是</text>
+
+      <!-- Compose target -->
+      <rect x="645" y="462" width="190" height="62" rx="10" fill="#e6f5e8" stroke="#4c8452" stroke-width="1.8"/>
+      <text x="740" y="487" class="node-title">compose</text>
+      <text x="740" y="508" class="node-sub">根据工具结果组织答案</text>
+
+      <!-- RAG quality branch -->
+      <rect x="1165" y="462" width="230" height="62" rx="10" fill="#e7f6fb" stroke="#3f7d91" stroke-width="1.8"/>
+      <text x="1280" y="487" class="node-title">grade_documents</text>
+      <text x="1280" y="508" class="node-sub">判断检索资料是否相关</text>
+
+      <polygon points="1280,550 1390,595 1280,640 1170,595" fill="#e7f6fb" stroke="#3f7d91" stroke-width="1.8"/>
+      <text x="1280" y="589" class="node-title">资料充分?</text>
+      <text x="1280" y="608" class="node-sub">或已达到第二轮</text>
+      <text x="1094" y="583" class="small">是 / 已重试</text>
+      <text x="1388" y="583" class="small">否</text>
+
+      <rect x="925" y="622" width="230" height="62" rx="10" fill="#fff8dc" stroke="#c89c2d" stroke-width="1.8"/>
+      <text x="1040" y="647" class="node-title">rewrite_query</text>
+      <text x="1040" y="668" class="node-sub">保守同义词替换和问题清洗</text>
+
+      <rect x="1165" y="622" width="230" height="62" rx="10" fill="#fff0e6" stroke="#a66438" stroke-width="1.8"/>
+      <text x="1280" y="647" class="node-title">retry_knowledge</text>
+      <text x="1280" y="668" class="node-sub">第二次检索，然后返回 Grade</text>
+
+      <!-- Verify and commit -->
+      <rect x="645" y="690" width="210" height="60" rx="10" fill="#e7f6fb" stroke="#3f7d91" stroke-width="1.8"/>
+      <text x="750" y="714" class="node-title">verify_answer</text>
+      <text x="750" y="734" class="node-sub">检查引用、编号、时间、金额</text>
+
+      <polygon points="750,772 855,803 750,834 645,803" fill="#fff4d8" stroke="#9a752b" stroke-width="1.8"/>
+      <text x="750" y="799" class="node-title">有充分证据?</text>
+      <text x="750" y="817" class="node-sub">grounded</text>
+
+      <rect x="350" y="776" width="145" height="54" rx="9" fill="#f7ecec" stroke="#a45656" stroke-width="1.6"/>
+      <text x="422" y="800" class="node-title">fallback</text>
+      <text x="422" y="819" class="node-sub">回退工具原文</text>
+
+      <rect x="1005" y="776" width="180" height="54" rx="9" fill="#e9f8f4" stroke="#3b826d" stroke-width="1.6"/>
+      <text x="1095" y="800" class="node-title">commit_turn</text>
+      <text x="1095" y="819" class="node-sub">原子保存两条消息</text>
+
+      <ellipse cx="1350" cy="803" rx="70" ry="25" fill="#e8eefc" stroke="#46628f" stroke-width="1.8"/>
+      <text x="1350" y="808" class="node-title">END</text>
+
+      <text x="567" y="792" class="small">否</text>
+      <text x="927" y="792" class="small">是</text>
+
+      <!-- Legend / notes -->
+      <g transform="translate(40,390)">
+        <rect x="0" y="0" width="385" height="195" rx="12" fill="#f8fafc" stroke="#b6c0cf"/>
+        <text x="18" y="28" font-size="13" font-weight="700">两种 Planner，共用同一图</text>
+        <rect x="18" y="45" width="156" height="42" rx="7" fill="#f2edff" stroke="#8065af"/>
+        <text x="96" y="64" class="small" text-anchor="middle" font-weight="700">RuleBasedPlanner</text>
+        <text x="96" y="79" class="small" text-anchor="middle">完全离线、关键词规则</text>
+        <rect x="197" y="45" width="166" height="42" rx="7" fill="#e8f6e9" stroke="#4c8452"/>
+        <text x="280" y="64" class="small" text-anchor="middle" font-weight="700">DeepSeekPlanner</text>
+        <text x="280" y="79" class="small" text-anchor="middle">JSON计划、失败回退Rule</text>
+        <text x="18" y="115" class="small">知识检索：BM25 + 本地向量 + Weighted RRF</text>
+        <text x="18" y="139" class="small">有界循环：Grade → Rewrite → Retrieve，最多两轮</text>
+        <text x="18" y="163" class="small">Web：SQLite Checkpoint；CLI：轻量内存会话</text>
+        <text x="18" y="186" class="small">最终仅持久化最近会话，不保存工具正文和检索片段</text>
+      </g>
+    </svg>
+  </section>
+</body>
+</html>
