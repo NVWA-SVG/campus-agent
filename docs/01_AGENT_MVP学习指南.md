@@ -51,8 +51,8 @@ CLI 只负责输入输出，不应该包含课程查询规则。
 
 ```text
 读取历史
-→ 让 Planner 生成 Plan
-→ 通过 ToolRegistry 执行 ToolCall
+→ Rule 生成 Plan，或 ChatModel.bind_tools 生成标准 tool_calls
+→ 通过 ToolRegistry 并发执行互不依赖的 ToolCall
 → 如果检索不足，则保守改写并最多重试一次
 → Planner 整理 ToolResult
 → Verifier 检查引用和关键事实
@@ -63,7 +63,7 @@ CLI 只负责输入输出，不应该包含课程查询规则。
 
 ### 3. 规划
 
-阅读 `campus_agent/planner.py`。当前使用规则识别意图和参数，因此无须联网。以后真实 LLM 也必须返回相同的 `Plan` 和 `ToolCall`，这样主循环不需要重写。
+先阅读 `campus_agent/planner.py` 的离线规则实现，再阅读 `campus_agent/tool_calling_planner.py`。DeepSeek 生产链通过 `init_chat_model` 初始化官方集成，用 `bind_tools()` 把同一份工具 JSON Schema 交给模型，并把 `AIMessage.tool_calls` 转成稳定的领域 `Plan/ToolCall`。模型结果仍要经过本地白名单和参数校验，失败时回退规则 Planner。
 
 ### 4. 工具
 
@@ -72,6 +72,8 @@ CLI 只负责输入输出，不应该包含课程查询规则。
 - `Tool` 定义所有工具共同遵守的接口。
 - `ToolRegistry` 负责查找和执行工具。
 - 具体工具只负责一个明确的业务能力。
+
+同一 Plan 中互不依赖的多个调用会并发执行，但结果、Citation 和 Trace 仍按规划顺序整理。工具结果随后被包装成标准 `ToolMessage` 回送模型。
 
 工具不能直接读取 CLI，也不应该自行保存会话记忆。
 

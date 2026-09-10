@@ -1,0 +1,15 @@
+services:
+  campus-agent:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "${CAMPUS_SERVER_BIND_IP:-127.0.0.1}:${CAMPUS_SERVER_PORT:-8000}:8000"
+    volumes:
+      - campus-agent-data:/data
+    restart: unless-stopped
+
+volumes:
+  campus-agent-data:

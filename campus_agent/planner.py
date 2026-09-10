@@ -20,6 +20,23 @@ class Planner(Protocol):
     def compose(self, query: str, results: Sequence[ToolResult]) -> str: ...
 
 
+class ContextualComposer(Protocol):
+    """可选的增强回答接口，用于保留标准模型工具消息上下文。
+
+    旧 Planner 只需要实现 ``compose``；支持原生工具调用的模型实现这个接口后，
+    Graph 会把历史、ToolCall 和 ToolResult 一并传入。
+    """
+
+    def compose_with_context(
+        self,
+        query: str,
+        history: Sequence[Message],
+        calls: Sequence[ToolCall],
+        results: Sequence[ToolResult],
+        tool_descriptions: Sequence[dict[str, object]],
+    ) -> str: ...
+
+
 class RuleBasedPlanner:
     """用于离线 MVP 的可替换规划器。
 
@@ -27,6 +44,9 @@ class RuleBasedPlanner:
     """
 
     _course_words = ("课表", "上课", "什么课", "在哪里上", "教室", "几点上课")
+    _greetings = {"你好", "您好", "嗨", "hi", "hello", "hey"}
+    _history_words = ("会话", "对话", "聊天", "记录", "历史", "记忆")
+    _delete_words = ("删除", "清空", "清除", "移除")
     _knowledge_process_words = (
         "流程",
         "指南",
@@ -106,6 +126,26 @@ class RuleBasedPlanner:
         cleaned_query = query.strip()
         if not cleaned_query:
             return Plan(summary="输入为空", direct_answer="请输入你想查询的校园事务。")
+
+        normalized_query = cleaned_query.lower().strip("！!。,.，？? ")
+        if normalized_query in self._greetings:
+            return Plan(
+                summary="回应简单问候",
+                direct_answer=(
+                    "你好！我可以查询课程、校园办事流程和已接入的校园服务状态。"
+                    "例如你可以问：周三有什么课？"
+                ),
+            )
+        if any(word in cleaned_query for word in self._history_words) and any(
+            word in cleaned_query for word in self._delete_words
+        ):
+            return Plan(
+                summary="说明会话清理方式",
+                direct_answer=(
+                    "可以。命令行输入 /clear；网页端使用“清空会话”功能即可删除"
+                    "当前会话记录。"
+                ),
+            )
 
         available_names = {
             str(description.get("name")) for description in tool_descriptions

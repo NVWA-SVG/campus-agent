@@ -1,0 +1,8 @@
+# Optional per-command Cargo source replacement for networks that cannot reach crates.io.
+# build_desktop.ps1 only loads this file when -CargoRegistry rsproxy is explicit.
+[source.crates-io]
+replace-with = "rsproxy"
+
+[source.rsproxy]
+registry = "sparse+https://rsproxy.cn/index/"
+

@@ -16,10 +16,14 @@ class CampusGraphState(TypedDict):
     # 其余字段通过 UntrackedValue 标记为一次回合的临时工作区：即使节点异常
     # 或 SSE 被客户端中断，也不会把问题、工具输出或知识正文写入 checkpoint。
     query: Annotated[str, UntrackedValue]
+    original_query: Annotated[str, UntrackedValue]
     session_id: Annotated[str, UntrackedValue]
     planner_mode: Annotated[str, UntrackedValue]
     history: list[MessagePayload]
     events: Annotated[list[dict[str, str]], UntrackedValue]
+    course_intent: NotRequired[Annotated[bool, UntrackedValue]]
+    course_only: NotRequired[Annotated[bool, UntrackedValue]]
+    course_weekday: NotRequired[Annotated[str | None, UntrackedValue]]
     plan_summary: NotRequired[Annotated[str, UntrackedValue]]
     direct_answer: NotRequired[Annotated[str | None, UntrackedValue]]
     tool_calls: NotRequired[Annotated[list[dict[str, object]], UntrackedValue]]

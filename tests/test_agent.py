@@ -91,6 +91,23 @@ class CampusAgentTests(unittest.TestCase):
         response = self.agent.ask("帮我写一首诗")
         self.assertIn("目前可以查询", response.answer)
 
+    def test_greeting_does_not_trigger_an_unrelated_knowledge_search(self) -> None:
+        response = self.agent.ask("你好")
+
+        self.assertIn("你好", response.answer)
+        self.assertFalse(
+            any(event.event_type == "tool_result" for event in response.events)
+        )
+
+    def test_history_deletion_question_explains_real_controls(self) -> None:
+        response = self.agent.ask("这个会话记录能删除吗")
+
+        self.assertIn("/clear", response.answer)
+        self.assertIn("清空会话", response.answer)
+        self.assertFalse(
+            any(event.event_type == "tool_result" for event in response.events)
+        )
+
     def test_history_is_separated_by_session(self) -> None:
         self.agent.ask("周一有什么课？", session_id="a")
         self.assertEqual(len(self.agent.history("a")), 2)

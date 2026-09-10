@@ -10,15 +10,16 @@
 |---|---|
 | 工作流 | LangGraph StateGraph，Plan → Tool → Grade/Rewrite → Compose → Verify → Commit |
 | 检索 | BM25 + BGE Vector + Weighted RRF，metadata 过滤与结构化 Citation |
-| 模型 | 本地 Rule 默认运行；DeepSeek Planner/Composer 可选且失败安全回退 |
+| 模型 | 本地 Rule 默认运行；DeepSeek 使用 LangChain 标准消息与原生工具调用，失败安全回退 |
 | 服务 | FastAPI + 原生 Web + POST SSE Trace + SQLite Checkpoint |
 | 业务集成 | Mock/Official 可替换只读校园 API，TTL/Stale/Singleflight 缓存 |
-| 质量保障 | 179 项自动化测试、28 个 subtests、100 条版本化离线评测用例 |
+| 质量保障 | 186 项自动化测试、28 个 subtests、100 条版本化离线评测用例 |
 
 ## 当前能力
 
 - Rule 与 DeepSeek 两种 Planner 使用同构的 LangGraph runtime，共享知识库、SQLite Saver 和会话 thread。
-- `query_courses`、`search_campus_knowledge`、`query_campus_service_status` 三个白名单工具，支持单次多工具任务。
+- DeepSeek 路径通过 `init_chat_model(..., model_provider="deepseek")` 与 `bind_tools()` 返回标准 `AIMessage.tool_calls`，工具结果以 `ToolMessage` 回送模型。
+- `query_courses`、`search_campus_knowledge`、`query_campus_service_status` 三个白名单工具，支持单次多工具任务；同轮独立调用并发执行并保持规划顺序。
 - Markdown/TXT/PDF 本地摄取、持久化、删除和原子重建索引。
 - BM25 + 本地向量 + RRF 的 Hybrid Retrieval；支持真实中文 BGE、模型版本锁定、增量向量缓存，索引期或查询期故障自动降级 BM25。
 - Chunk metadata 与 `domain/category/version/origin/document_id` 服务端过滤；上传 API 可登记 domain、category 和 version。
@@ -49,6 +50,8 @@ CampusAgent（兼容入口）
        ▼
 LangGraph StateGraph
   START → plan
+             ├─ Rule：本地确定性规划
+             ├─ DeepSeek：bind_tools → AIMessage.tool_calls
              ├─ direct answer ─────────────────────────────┐
              └─ execute tools                              │
                     ├─ 只有课程工具 → compose → verify ───┤
@@ -58,6 +61,7 @@ LangGraph StateGraph
                                          → rewrite          │
                                          → retrieve（最多1次）
                                          → grade → compose  │
+                                           ToolMessage → LLM│
                                                        verify
                                                           │
                                                      commit turn
@@ -87,13 +91,20 @@ Offline Evaluation
   └─ 100条固定JSONL → BM25 / Vector / Hybrid → JSONL + Markdown报告
 ```
 
-更适合阅读和面试讲解的图形版本：[`Campus-Agent流程图.pdf`](docs/Campus-Agent流程图.pdf)；可编辑源文件：[`campus-agent-flow-diagrams.html`](docs/campus-agent-flow-diagrams.html)。
+学习总结：[`03_Agent模型工具调用与LangGraph架构总结.md`](docs/03_Agent模型工具调用与LangGraph架构总结.md)。图形版本：[`Campus-Agent流程图.pdf`](docs/Campus-Agent流程图.pdf)；可编辑源文件：[`campus-agent-flow-diagrams.html`](docs/campus-agent-flow-diagrams.html)。
 
 所有生产入口都经过相同的 LangGraph 拓扑。Rule 与 DeepSeek 是两个同构的编译 runtime，不是假装成同一个实例；它们共享 Saver/thread 与同一个知识索引。`campus_agent/agent.py` 只是稳定兼容层，实际图定义位于 `campus_agent/graph/`。
 
 ### LangChain 在哪里
 
-主生产链使用的是 LangGraph + 项目自己的 Planner/ToolRegistry。`campus_agent/langchain_agent.py` 另外提供 LangChain v1 `create_agent` 与 `@tool` 的可重复演示，用来展示标准模型—工具循环；它不是网页主链路。这样可以准确说明“会 LangChain，也真正把 LangGraph 用在生产编排上”，不会把旁路 Demo 冒充主架构。
+生产主链分工如下：
+
+- LangGraph `StateGraph`：定义 Plan → Tool → Grade/Rewrite → Compose → Verify → Commit 的业务控制流；
+- LangChain ChatModel：统一 DeepSeek 消息接口，通过 `bind_tools()` 生成标准 `AIMessage.tool_calls`，并接收 `ToolMessage`；
+- 项目 `ToolRegistry`：保留本地工具白名单、异常隔离、结构化 `ToolResult` 与 Citation。这里没有直接换成 `ToolNode`，因为 Grade/Verify 需要使用工具 artifact 中的命中文档和结构化引用；
+- `campus_agent/langchain_agent.py`：仍是独立的 `create_agent` 教学 Demo，用来和生产自定义图对照，不进入 Web 路由。
+
+旧的 JSON Planner/HTTP Client 保留为兼容与回归测试实现，生产 CLI/Web 的 `deepseek` 模式已使用 `campus_agent/tool_calling_planner.py`。准确表述是“官方 LangGraph 编排 + LangChain 标准模型工具协议 + 自定义安全工具执行和 RAG 质量节点”。
 
 ### Dify 在哪里
 
@@ -156,6 +167,43 @@ $env:CAMPUS_WEB_ALLOWED_HOSTS="127.0.0.1,localhost,campus.example.com"
 
 当前知识库上传、删除、重建接口没有用户登录鉴权，因此不要把 `lan` 模式直接映射到公网。GitHub Pages 只能托管静态文件，不能运行本项目的 Python/FastAPI 后端。正式分享应把应用部署到支持 Python 的服务器或容器，并至少补充登录鉴权、HTTPS、请求限流、持久卷和服务端 Secret 管理；临时外网演示可使用带身份访问策略的正式 Cloudflare Tunnel，将服务地址指向 `http://localhost:8000`，同时把公网域名加入 `CAMPUS_WEB_ALLOWED_HOSTS`。Cloudflare Quick Tunnel 不支持 SSE，不适合当前网页的流式聊天接口。
 
+### Rust 原生桌面版（无浏览器、无端口）
+
+`desktop-rust/` 提供基于 Rust `eframe/egui` 的原生 Windows 界面。桌面进程不会启动 FastAPI、浏览器或监听端口，而是通过版本化 NDJSON 协议与隐藏的 Python Worker 通信；Python Worker 继续复用同一套 LangGraph、Tool Calling、RAG、SQLite Checkpoint、校园业务工具和 LangSmith Trace。
+
+原生界面包含 Planner 切换、聊天、LangGraph 执行轨迹、模型指标、历史会话、资料引用，以及知识库上传、删除和重建。开发模式可以双击：
+
+```text
+start-campus-agent-desktop.cmd
+```
+
+首次构建前安装 Rustup，并为虚拟环境安装桌面构建依赖：
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[semantic,dev,desktop-build]"
+.\scripts\build_desktop.ps1
+```
+
+如果当前网络无法连接 crates.io，可以只对本次构建使用 `rsproxy.cn` 镜像（不会修改全局 Cargo 配置）：
+
+```powershell
+.\scripts\build_desktop.ps1 -CargoRegistry rsproxy
+```
+
+构建完成后运行：
+
+```text
+dist\CampusAgent\CampusAgent.exe
+```
+
+默认发布不复制 BGE 模型，缺少本地模型时安全回退到 Hashing Embedding。需要制作包含现有 BGE 缓存的离线发布目录时使用：
+
+```powershell
+.\scripts\build_desktop.ps1 -IncludeModelCache
+```
+
+桌面主程序继承当前进程的 `DEEPSEEK_*` 与 `LANGSMITH_*` 环境变量，但不会把 API Key 写入安装目录。开发时上传的知识资料、向量缓存和日志位于项目 `.campus_agent_data/`；发布版写入当前用户的 `%LOCALAPPDATA%\CampusAgent`。
+
 可以尝试：
 
 ```text
@@ -178,11 +226,21 @@ $env:DEEPSEEK_MAX_RETRIES="1"
 python -m campus_agent.web
 ```
 
-没有设置 `DEEPSEEK_API_KEY` 时，选择 DeepSeek 也不会发起网络请求，而是本地回退 Rule Planner。Key 只存在于 Python 后端模型客户端，不进入 Graph State、SQLite、HTML、JavaScript、浏览器存储或 API 响应。
+没有设置 `DEEPSEEK_API_KEY` 时，选择 DeepSeek 也不会发起网络请求，而是本地回退 Rule Planner。Key 只存在于 Python 后端模型客户端，不进入 Graph State、SQLite、HTML、JavaScript、浏览器存储或 API 响应。DeepSeek 使用官方 `langchain-deepseek` 集成；底层模型响应保持非 token 流式，网页 SSE 展示的是 LangGraph 节点进度。
 
 ## LangSmith 调试（可选）
 
 当前生产主链是真实的 LangGraph `StateGraph`，因此可以直接打开基础 LangSmith Trace，查看节点顺序、分支、输入输出、耗时和异常：
+
+推荐直接双击 `start-campus-agent-langsmith.cmd`。启动器会隐藏输入 API Key，只把 Key 放入本次 PowerShell/Agent 子进程，既不写入磁盘，也不打印到终端；服务停止后清理临时环境变量。也可以从 PowerShell 指定区域和 Project：
+
+```powershell
+.\start-campus-agent-langsmith.cmd -Region apac -Project campus-agent-dev
+```
+
+区域支持 `us`（默认）、`eu`、`apac` 和 `aws-us`，必须与 LangSmith Workspace 实际区域一致。如果 API Key 关联多个 Workspace，再追加 `-WorkspaceId 你的WorkspaceID`。启动器使用进程级 `ExecutionPolicy Bypass` 读取项目内脚本，不会修改用户或系统的 PowerShell 执行策略。
+
+也可以在当前终端手动配置：
 
 ```powershell
 $env:LANGSMITH_TRACING="true"
@@ -191,9 +249,11 @@ $env:LANGSMITH_PROJECT="campus-agent-dev"
 .\start-campus-agent.cmd
 ```
 
-随后在 LangSmith 的 `campus-agent-dev` Project 中查看 `plan`、`execute_tools`、`grade_documents`、`rewrite_query`、`compose`、`verify_answer` 和 `commit_turn` 等节点。当前 DeepSeek 客户端、ToolRegistry 和 Hybrid Retriever 是自定义 Python 实现，尚未使用 `@traceable` 拆成独立的 LLM/Tool/Retriever 子 Span，因此准确表述是“支持 LangGraph 基础追踪”，不是“已经完成全链路细粒度可观测性”。
+随后在 LangSmith 的 `campus-agent-dev` Project 中查看 `plan`、`execute_tools`、`grade_documents`、`rewrite_query`、`compose`、`verify_answer` 和 `commit_turn` 等节点。DeepSeek 模型调用通过 LangChain Runnable 上报带 `component=plan/compose` 的子 Span；ToolRegistry 和 Hybrid Retriever 仍是自定义 Python 实现，尚未使用 `@traceable` 拆成独立子 Span。因此当前具备“Graph + LLM 调用追踪”，还不是所有工具与检索细节都具有独立 Span。
 
 Trace 可能包含用户问题、节点状态、工具结果和命中的知识片段，不要在开启追踪时提交个人隐私或未获授权的校内资料。关闭当前 PowerShell 或移除上述三个环境变量即可停用上报。
+
+不要把真实 Key 写进 README、`.cmd`、`.ps1`、`.env.example`、Git commit、聊天消息或截图。Key 一旦在这些位置暴露，应立即在 LangSmith `Settings → API Keys` 删除并重新生成，而不是继续使用。
 
 ## 向量检索配置
 

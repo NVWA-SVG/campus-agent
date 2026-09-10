@@ -1,4 +1,9 @@
-"""使用DeepSeek生成结构化Plan，并在失败时回退到规则规划。"""
+"""旧版 JSON Planner，保留给兼容调用方和回归测试。
+
+CLI/Web 生产入口已经迁移到 ``tool_calling_planner.NativeToolCallingPlanner``。
+新实现使用 LangChain ``bind_tools``、``AIMessage.tool_calls`` 和 ``ToolMessage``；
+本模块不再是默认在线链路。
+"""
 
 from __future__ import annotations
 

@@ -149,6 +149,7 @@ class AgentEvent:
     """允许 CLI/Web 对外展示的白名单执行轨迹。"""
 
     event_type: Literal[
+        "understand",
         "plan",
         "retrieve",
         "tool_result",

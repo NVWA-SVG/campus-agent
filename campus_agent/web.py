@@ -34,12 +34,7 @@ from campus_agent.business_api import (
     OfficialHttpCampusBusinessGateway,
 )
 from campus_agent.checkpoint import PrunableSqliteSaver
-from campus_agent.deepseek import (
-    DEFAULT_DEEPSEEK_MODEL,
-    DeepSeekChatClient,
-    DeepSeekConfig,
-)
-from campus_agent.deepseek_planner import DeepSeekPlanner
+from campus_agent.deepseek import DEFAULT_DEEPSEEK_MODEL
 from campus_agent.domain import AgentEvent, AgentResponse
 from campus_agent.memory import ConversationMemory
 from campus_agent.rag.knowledge_base import (
@@ -53,6 +48,7 @@ from campus_agent.rag.knowledge_base import (
     UnsupportedDocumentError,
 )
 from campus_agent.tools import CampusKnowledgeTool, CampusServiceStatusTool
+from campus_agent.tool_calling_planner import NativeToolCallingPlanner
 
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -202,12 +198,14 @@ class WebAgentService:
         memory = ConversationMemory() if checkpointer is None else None
         configuration_error = None
         try:
-            deepseek_planner = DeepSeekPlanner.from_environment()
+            deepseek_planner = NativeToolCallingPlanner.from_deepseek_environment()
         except (TypeError, ValueError):
             # 在线配置错误不能阻止完全离线的规则模式启动。
             configuration_error = "DeepSeek 环境变量无效，请检查模型、超时、重试和接口地址配置"
-            deepseek_planner = DeepSeekPlanner(
-                DeepSeekChatClient(DeepSeekConfig(api_key=None))
+            deepseek_planner = NativeToolCallingPlanner(
+                None,
+                model_name=DEFAULT_DEEPSEEK_MODEL,
+                api_key_configured=False,
             )
         business_tool = None
         try:

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 
-from campus_agent.domain import Citation, Message, ToolCall, ToolResult
+from campus_agent.domain import Citation, Message, Plan, ToolCall, ToolResult
 from campus_agent.graph.state import CampusGraphState
+from campus_agent.input_understanding import CampusInputUnderstander
 from campus_agent.memory import ConversationMemory
 from campus_agent.planner import Planner
 from campus_agent.rag.quality import AnswerVerifier, DocumentGrader, QueryRewriter
@@ -13,6 +15,7 @@ from campus_agent.tooling import ToolRegistry
 
 
 KNOWLEDGE_TOOL_NAME = "search_campus_knowledge"
+COURSE_TOOL_NAME = "query_courses"
 
 
 def _history_messages(state: CampusGraphState) -> tuple[Message, ...]:
@@ -121,6 +124,94 @@ def _tool_event(call: ToolCall, result: ToolResult) -> dict[str, str]:
     }
 
 
+def build_understand_input_node(
+    understander: CampusInputUnderstander,
+) -> Callable:
+    def understand_input_node(state: CampusGraphState) -> dict[str, object]:
+        result = understander.understand(state["query"])
+        events = list(state.get("events", []))
+        if result.changes:
+            events.append(
+                {
+                    "type": "understand",
+                    "detail": (
+                        f"输入归一化：{result.normalized_query}；"
+                        + "；".join(result.changes)
+                    ),
+                }
+            )
+        return {
+            "query": result.normalized_query,
+            "course_intent": result.course_intent,
+            "course_only": result.course_only,
+            "course_weekday": result.course_weekday,
+            "events": events,
+        }
+
+    return understand_input_node
+
+
+def _guard_course_route(
+    state: CampusGraphState,
+    plan: Plan,
+    tools: ToolRegistry,
+) -> Plan:
+    """明显的课程问题不能因模型误判而只进入静态知识库。"""
+
+    weekday = state.get("course_weekday")
+    available_names = {
+        str(description.get("name")) for description in tools.descriptions()
+    }
+    if (
+        not state.get("course_intent")
+        or not isinstance(weekday, str)
+        or COURSE_TOOL_NAME not in available_names
+    ):
+        return plan
+
+    course_call = next(
+        (call for call in plan.tool_calls if call.name == COURSE_TOOL_NAME),
+        None,
+    )
+    if course_call is None:
+        keyword = next(
+            (
+                item
+                for item in ("Python", "机器学习", "人工智能", "英语")
+                if item.lower() in state["query"].lower()
+            ),
+            "",
+        )
+        course_call = ToolCall(
+            call_id="guard-query-courses",
+            name=COURSE_TOOL_NAME,
+            arguments={"weekday": weekday, "keyword": keyword},
+        )
+    else:
+        course_call = ToolCall(
+            call_id=course_call.call_id,
+            name=course_call.name,
+            arguments={**course_call.arguments, "weekday": weekday},
+        )
+
+    if state.get("course_only"):
+        guarded_calls = (course_call,)
+    else:
+        guarded_calls = tuple(
+            course_call if call.name == COURSE_TOOL_NAME else call
+            for call in plan.tool_calls
+        )
+        if not any(call.name == COURSE_TOOL_NAME for call in plan.tool_calls):
+            guarded_calls = (*guarded_calls, course_call)
+
+    if plan.direct_answer is None and guarded_calls == plan.tool_calls:
+        return plan
+    return Plan(
+        summary=f"课程路由校正：调用 {COURSE_TOOL_NAME}（{weekday}）",
+        tool_calls=guarded_calls,
+    )
+
+
 def build_plan_node(planner: Planner, tools: ToolRegistry) -> Callable:
     def plan_node(state: CampusGraphState) -> dict[str, object]:
         plan = planner.plan(
@@ -128,6 +219,7 @@ def build_plan_node(planner: Planner, tools: ToolRegistry) -> Callable:
             _history_messages(state),
             tools.descriptions(),
         )
+        plan = _guard_course_route(state, plan, tools)
         if sum(call.name == KNOWLEDGE_TOOL_NAME for call in plan.tool_calls) > 1:
             # 当前 Agentic-RAG 状态机按一次知识任务进行 Grade/Rewrite/Retry。
             # 在图边界再次校验，避免自定义 Planner 绕过 DeepSeek 的本地校验。
@@ -173,18 +265,32 @@ def build_execute_tools_node(
         active_retrieval_query = ""
         retrieval_attempts = 0
 
+        calls: list[ToolCall] = []
         for raw_call in state.get("tool_calls", [])[:max_tool_calls]:
             call = _call_from_raw(state, raw_call)
+            calls.append(call)
             if call.name == KNOWLEDGE_TOOL_NAME:
                 active_retrieval_query = str(call.arguments.get("query", state["query"]))
                 retrieval_attempts = 1
+        # 同一轮互不依赖的工具可以并发读取数据；executor.map 保持规划顺序，
+        # 因而 ToolResult、Citation 和前端 Trace 仍具有稳定顺序。
+        if len(calls) > 1:
+            with ThreadPoolExecutor(
+                max_workers=min(len(calls), max_tool_calls),
+                thread_name_prefix="campus-tool",
+            ) as executor:
+                results = list(executor.map(tools.execute, calls))
+        else:
+            results = [tools.execute(call) for call in calls]
+
+        for call, result in zip(calls, results, strict=True):
+            if call.name == KNOWLEDGE_TOOL_NAME:
                 events.append(
                     {
                         "type": "retrieve",
                         "detail": f"第1次检索：{active_retrieval_query}",
                     }
                 )
-            result = tools.execute(call)
             serialized_results.append(_serialize_tool_result(result))
             citations.extend(citation.as_dict() for citation in result.citations)
             if call.name == KNOWLEDGE_TOOL_NAME:
@@ -334,7 +440,7 @@ def build_retry_knowledge_node(tools: ToolRegistry) -> Callable:
     return retry_knowledge_node
 
 
-def build_compose_node(planner: Planner) -> Callable:
+def build_compose_node(planner: Planner, tools: ToolRegistry) -> Callable:
     def compose_node(state: CampusGraphState) -> dict[str, object]:
         serialized_results = list(state.get("tool_results", []))
         citations = list(state.get("citations", []))
@@ -368,8 +474,26 @@ def build_compose_node(planner: Planner) -> Callable:
             _tool_result_from_dict(result)
             for result in serialized_results
         )
+        calls = tuple(
+            _call_from_raw(state, raw_call)
+            for raw_call in state.get("tool_calls", [])
+        )
+        compose_with_context = getattr(planner, "compose_with_context", None)
+        # 原生工具调用 Planner 需要完整的 AIMessage -> ToolMessage 上下文；旧的
+        # 规则 Planner 和教学 Stub 仍可继续使用精简 compose 接口。
+        answer = (
+            compose_with_context(
+                state["query"],
+                _history_messages(state),
+                calls,
+                results,
+                tools.descriptions(),
+            )
+            if callable(compose_with_context)
+            else planner.compose(state["query"], results)
+        )
         return {
-            "answer": planner.compose(state["query"], results),
+            "answer": answer,
             "tool_results": serialized_results,
             "citations": citations,
             "retrieved_documents": retrieved_documents,
@@ -417,7 +541,10 @@ def build_commit_turn_node(
 
     def commit_turn_node(state: CampusGraphState) -> dict[str, object]:
         answer = str(state.get("answer", ""))
-        user_message = Message(role="user", content=state["query"])
+        user_message = Message(
+            role="user",
+            content=str(state.get("original_query") or state["query"]),
+        )
         assistant_message = Message(role="assistant", content=answer)
         if memory is not None:
             memory.add_turn(

@@ -16,6 +16,7 @@ from campus_agent.graph.nodes import (
     build_plan_node,
     build_retry_knowledge_node,
     build_rewrite_query_node,
+    build_understand_input_node,
     build_verify_answer_node,
     direct_answer_node,
     route_after_grade,
@@ -24,6 +25,7 @@ from campus_agent.graph.nodes import (
     route_after_tools,
 )
 from campus_agent.graph.state import CampusGraphState
+from campus_agent.input_understanding import CampusInputUnderstander
 from campus_agent.memory import ConversationMemory
 from campus_agent.planner import Planner, RuleBasedPlanner
 from campus_agent.rag.quality import (
@@ -45,6 +47,7 @@ class CampusGraphAgent:
         memory: ConversationMemory | None = None,
         max_tool_calls: int = 4,
         checkpointer: BaseCheckpointSaver | None = None,
+        input_understander: CampusInputUnderstander | None = None,
     ) -> None:
         if max_tool_calls < 1:
             raise ValueError("max_tool_calls 必须至少为 1")
@@ -53,10 +56,15 @@ class CampusGraphAgent:
         self._checkpointer = checkpointer
         self._memory = None if checkpointer is not None else (memory or ConversationMemory())
         self._max_tool_calls = max_tool_calls
+        self._input_understander = input_understander or CampusInputUnderstander()
         self._graph = self._compile_graph()
 
     def _compile_graph(self):
         workflow = StateGraph(CampusGraphState)
+        workflow.add_node(
+            "understand_input",
+            build_understand_input_node(self._input_understander),
+        )
         workflow.add_node("plan", build_plan_node(self._planner, self._tools))
         workflow.add_node("direct_answer", direct_answer_node)
         workflow.add_node(
@@ -66,7 +74,7 @@ class CampusGraphAgent:
                 max_tool_calls=self._max_tool_calls,
             ),
         )
-        workflow.add_node("compose", build_compose_node(self._planner))
+        workflow.add_node("compose", build_compose_node(self._planner, self._tools))
         workflow.add_node(
             "grade_documents",
             build_grade_documents_node(OfflineDocumentGrader()),
@@ -87,7 +95,8 @@ class CampusGraphAgent:
             ),
         )
         workflow.add_node("commit_turn", build_commit_turn_node(self._memory))
-        workflow.add_edge(START, "plan")
+        workflow.add_edge(START, "understand_input")
+        workflow.add_edge("understand_input", "plan")
         workflow.add_conditional_edges(
             "plan",
             route_after_plan,
@@ -264,9 +273,13 @@ class CampusGraphAgent:
     ) -> dict[str, object]:
         state: dict[str, object] = {
             "query": query,
+            "original_query": query,
             "session_id": session_id,
             "planner_mode": self._planner_name(),
             "events": [],
+            "course_intent": False,
+            "course_only": False,
+            "course_weekday": None,
             "errors": [],
             "plan_summary": "",
             "direct_answer": None,
@@ -330,6 +343,7 @@ def build_graph_agent(
     knowledge_tool: CampusKnowledgeTool | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
     extra_tools: Sequence[Tool] = (),
+    input_understander: CampusInputUnderstander | None = None,
 ) -> CampusGraphAgent:
     registry = ToolRegistry()
     registry.register(CourseQueryTool())
@@ -341,4 +355,5 @@ def build_graph_agent(
         tools=registry,
         memory=memory,
         checkpointer=checkpointer,
+        input_understander=input_understander,
     )

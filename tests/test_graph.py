@@ -64,6 +64,7 @@ class LangGraphWorkflowTests(unittest.TestCase):
             set(agent._graph.get_graph().nodes),
             {
                 "__start__",
+                "understand_input",
                 "plan",
                 "direct_answer",
                 "execute_tools",

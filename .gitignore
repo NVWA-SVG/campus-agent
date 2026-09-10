@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 .env
 .campus_agent_data/
+desktop-rust/target/
+build/desktop/
+dist/CampusAgent/

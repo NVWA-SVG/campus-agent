@@ -1,4 +1,8 @@
-"""DeepSeek Chat Completions客户端、配置和调用指标。"""
+"""DeepSeek 配置，以及保留给旧 JSON Planner 的兼容 HTTP 客户端。
+
+生产模型初始化由 ``tool_calling_planner`` 调用 LangChain 官方集成完成；这里的
+``DeepSeekConfig`` 仍是统一、安全的环境变量边界。
+"""
 
 from __future__ import annotations
 

@@ -7,7 +7,7 @@ import json
 import os
 
 from campus_agent.agent import build_default_agent
-from campus_agent.deepseek_planner import DeepSeekPlanner
+from campus_agent.tool_calling_planner import NativeToolCallingPlanner
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,7 +28,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
-    planner = DeepSeekPlanner.from_environment() if args.planner == "deepseek" else None
+    planner = (
+        NativeToolCallingPlanner.from_deepseek_environment()
+        if args.planner == "deepseek"
+        else None
+    )
     agent = build_default_agent(planner=planner)
     session_id = "cli"
 

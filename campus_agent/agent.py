@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from langgraph.checkpoint.base import BaseCheckpointSaver
 
 from campus_agent.graph.workflow import CampusGraphAgent
+from campus_agent.input_understanding import CampusInputUnderstander
 from campus_agent.memory import ConversationMemory
 from campus_agent.planner import Planner, RuleBasedPlanner
 from campus_agent.tooling import Tool, ToolRegistry
@@ -27,6 +28,7 @@ def build_default_agent(
     knowledge_tool: CampusKnowledgeTool | None = None,
     checkpointer: BaseCheckpointSaver | None = None,
     extra_tools: Sequence[Tool] = (),
+    input_understander: CampusInputUnderstander | None = None,
 ) -> CampusAgent:
     registry = ToolRegistry()
     registry.register(CourseQueryTool())
@@ -38,4 +40,5 @@ def build_default_agent(
         tools=registry,
         memory=memory,
         checkpointer=checkpointer,
+        input_understander=input_understander,
     )
