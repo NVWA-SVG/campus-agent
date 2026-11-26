@@ -66,7 +66,8 @@ def main() -> None:
     if args.baseline is not None:
         write_baseline(run, args.baseline)
     payload = {
-        "schema_version": "1.2",
+        "schema_version": "1.3",
+        "evaluation_methods": run.as_dict(include_results=False)["evaluation_methods"],
         "generated_at": run.generated_at,
         "embedding_provider": run.embedding_provider,
         "embedding_model": run.embedding_model,

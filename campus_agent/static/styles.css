@@ -45,6 +45,15 @@ body {
   overflow-x: hidden;
 }
 
+.chat-page {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
 button,
 textarea {
   font: inherit;
@@ -200,10 +209,11 @@ button {
 
 .workspace {
   width: min(1560px, calc(100% - 40px));
-  min-height: calc(100vh - 118px);
+  min-height: 0;
   margin: 20px auto;
   display: grid;
   grid-template-columns: 286px minmax(480px, 1fr) 330px;
+  grid-template-rows: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -216,8 +226,18 @@ button {
 }
 
 .side-panel {
+  min-width: 0;
+  min-height: 0;
   border-radius: var(--radius-xl);
   padding: 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd2df transparent;
+}
+
+.side-panel > section {
+  flex-shrink: 0;
 }
 
 .controls-panel {
@@ -483,7 +503,8 @@ button {
 }
 
 .chat-panel {
-  min-height: 720px;
+  min-width: 0;
+  min-height: 0;
   border-radius: var(--radius-xl);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
@@ -537,6 +558,8 @@ button {
   min-height: 0;
   padding: 24px clamp(18px, 4vw, 38px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: #cbd2df transparent;
 }
@@ -579,6 +602,7 @@ button {
 }
 
 .message-content {
+  min-width: 0;
   max-width: min(82%, 680px);
 }
 
@@ -715,6 +739,7 @@ button {
 .composer textarea {
   width: 100%;
   max-height: 130px;
+  max-height: min(130px, 20dvh);
   padding: 2px 0 8px;
   border: 0;
   outline: 0;
@@ -1006,20 +1031,23 @@ button {
 
 @media (max-width: 1180px) {
   .workspace {
-    grid-template-columns: 250px minmax(460px, 1fr);
+    grid-template-columns: 250px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .controls-panel {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .chat-panel {
+    grid-column: 2;
+    grid-row: 1 / -1;
   }
 
   .inspector-panel {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 1.35fr 1fr 1fr;
-    align-items: start;
-  }
-
-  .inspector-section + .inspector-section {
-    padding: 0 0 0 22px;
-    border-top: 0;
-    border-left: 1px solid var(--line);
+    grid-column: 1;
+    grid-row: 2;
   }
 
   .empty-state {
@@ -1038,7 +1066,15 @@ button {
 
   .workspace {
     width: min(100% - 24px, 720px);
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .side-panel {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .controls-panel {
@@ -1051,13 +1087,8 @@ button {
   }
 
   .chat-panel {
-    min-height: 690px;
-    grid-row: 1;
-  }
-
-  .inspector-panel {
-    grid-column: auto;
-    grid-template-columns: 1fr;
+    flex: 0 0 100%;
+    order: -1;
   }
 
   .inspector-section + .inspector-section {
@@ -1103,7 +1134,6 @@ button {
   }
 
   .chat-panel {
-    min-height: calc(100vh - 86px);
     border-radius: 18px;
   }
 
@@ -1130,6 +1160,25 @@ button {
 
   .composer-footer > span {
     display: none;
+  }
+}
+
+@media (max-height: 600px) {
+  .workspace {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  .chat-header {
+    min-height: 60px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .composer {
+    margin-bottom: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
   }
 }
 

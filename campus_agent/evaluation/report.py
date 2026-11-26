@@ -79,21 +79,24 @@ def _markdown(run: EvaluationRun) -> str:
         ),
         f"- Vector状态：`{run.vector_status}`",
         f"- 生成时间：{run.generated_at}",
+        "- 检索口径：人工标注 Chunk ID；Precision@K/Recall@K 均只统计可回答正例",
+        "- 生成口径：部分确定性检查；RAGAS Faithfulness 与 Answer Relevancy 尚未评估",
         "- Prompt Injection：`not_evaluated`（当前离线评测未执行真实工具路由）",
         "",
         "## 策略对比",
         "",
-        f"| 策略 | Hit@1 | Hit@{run.metric_k} | Recall@{run.metric_k} | MRR@{run.metric_k} | No-hit | FPR | Hard-negative安全拒答 | 失败数 |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
+        f"| 策略 | Hit@1 | Hit@{run.metric_k} | Precision@{run.metric_k} | Recall@{run.metric_k} | MRR@{run.metric_k} | No-hit | FPR | Hard-negative安全拒答 | 失败数 |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for strategy in run.strategies:
         overall = run.summaries[strategy]["overall"]
         lines.append(
-            "| {strategy} | {hit1} | {hit3} | {recall3} | "
+            "| {strategy} | {hit1} | {hit3} | {precision3} | {recall3} | "
             "{mrr3} | {no_hit} | {fpr} | {safe} | {failed} |".format(
                 strategy=strategy,
                 hit1=percentage(overall["hit_at_1"]),
                 hit3=percentage(overall[f"hit_at_{run.metric_k}"]),
+                precision3=percentage(overall[f"precision_at_{run.metric_k}"]),
                 recall3=percentage(overall[f"recall_at_{run.metric_k}"]),
                 mrr3=percentage(overall[f"mrr_at_{run.metric_k}"]),
                 no_hit=percentage(overall["no_hit_accuracy"]),

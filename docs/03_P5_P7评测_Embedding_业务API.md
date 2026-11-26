@@ -62,7 +62,22 @@ python -m scripts.evaluate_rag --output-dir eval\reports\hashing-v1
 - `case_results.jsonl`：每个策略、每条用例的排序和判定；
 - `failures.jsonl`：只保留失败案例，供 Error Analysis。
 
-指标包括 Hit@k、真正以相关 Chunk 数为分母的 Recall@k、MRR、No-hit/FPR、必要事实覆盖、metadata 泄漏、Agent Trace 一致性、注入 containment、延迟分位数。阈值只在 dev 上校准，冻结 test 不参与调参。
+指标包括 Hit@k、Precision@k、真正以相关 Chunk 数为分母的 Recall@k、MRR、No-hit/FPR、必要事实覆盖、metadata 泄漏、Agent Trace 一致性和延迟分位数。Prompt Injection 的完整工具路由在本离线 Runner 中未评估，报告明确标记 `not_evaluated`。阈值只在 dev 上校准，冻结 test 不参与调参。
+
+### 与 RAGAS 指标的关系
+
+当前 Runner 使用人工标注的 `relevant_chunk_ids` 进行可复现的 ID 级评估，没有安装或调用 RAGAS。正例的汇总口径是：
+
+```text
+Precision@k = 正例中进入前 k 位的正确 Chunk 总数 / 正例中实际返回的前 k 位 Chunk 总数
+Recall@k    = 正例中进入前 k 位的正确 Chunk 总数 / 正例中标注的正确 Chunk 总数
+```
+
+这是跨正例的微平均。无可回答正例或分母为零时报告 `N/A`；`metric_k` 不能超过用例请求的 `top_k`，防止把未返回的候选算进指标。严格无答案用例单独计入 No-hit/FPR；主题相关但缺少具体金额、时间等事实的用例单独检查安全拒答。MRR@k 衡量正确 Chunk 的首次命中排名。
+
+这里的 Precision@k 和 Recall@k 基于 Chunk ID，不等同于 RAGAS 的 LLM Context Precision 或按标准答案陈述计算的 Context Recall；RAGAS 的 Context Precision 还关注相关片段的排名。当前 `OfflineAnswerVerifier` 只检查 Citation 归属和部分可提取的编号、时间、金额，不能当作逐句 Faithfulness；必要事实覆盖也不能当作 Answer Relevancy。`summary.json` 的 `evaluation_methods` 明确记录了这些边界。
+
+下一步要评估 RAGAS Faithfulness 和 Answer Relevancy，应从**真实 Agent 执行**采集问题、实际生成的回答和实际提供给生成器的上下文，再准备独立的参考答案和人工复核样本。当前离线 Runner 的可回答用例只评估检索结果，不生成完整模型回答；给它直接计算生成质量分数会产生误导。模型评委的版本、提示词、采样配置和费用也应随报告记录，评委结果需要与人工抽检对照。
 
 ## 3. P6：真实中文 Embedding
 

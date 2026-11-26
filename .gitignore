@@ -5,6 +5,7 @@ __pycache__/
 .venv/
 .env
 .campus_agent_data/
+eval/reports/ragas-*.json
 desktop-rust/target/
 build/desktop/
 dist/CampusAgent/

@@ -23,6 +23,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]
 semantic = ["sentence-transformers>=5,<6"]
+ragas-eval = ["ragas==0.4.3", "langchain-community==0.3.31"]
 desktop-build = ["pyinstaller>=6.10,<7"]
 
 [project.scripts]

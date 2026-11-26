@@ -87,7 +87,32 @@ class EvaluationMetricTests(unittest.TestCase):
 
         self.assertEqual(metrics["hit_at_3"], 1.0)
         self.assertEqual(metrics["recall_at_3"], 0.5)
+        self.assertEqual(metrics["precision_at_3"], 0.5)
         self.assertEqual(metrics["mrr_at_3"], 1.0)
+
+    def test_precision_counts_retrieved_chunks_and_excludes_negative_cases(self) -> None:
+        positive = self._result(
+            expected_chunk_ids=("a",),
+            retrieved_chunk_ids=("x", "a", "y"),
+            retrieved_document_ids=("doc-x", "doc-a", "doc-y"),
+            retrieved_sources=("x.md", "a.md", "y.md"),
+        )
+        negative = self._result(
+            case_id="negative",
+            expected_answerable=False,
+            retrieval_expectation="no_hit",
+            expected_chunk_ids=(),
+            retrieved_chunk_ids=("z",),
+            retrieved_document_ids=("doc-z",),
+            retrieved_sources=("z.md",),
+        )
+
+        metrics = aggregate_metrics([positive, negative], k=3)
+
+        self.assertAlmostEqual(metrics["precision_at_3"], 1 / 3)
+        self.assertEqual(metrics["recall_at_3"], 1.0)
+        self.assertEqual(metrics["mrr_at_3"], 0.5)
+        self.assertEqual(metrics["false_positive_rate"], 1.0)
 
     def test_no_hit_accuracy_and_false_positive_rate_are_complements(self) -> None:
         clean = self._result(
@@ -113,6 +138,7 @@ class EvaluationMetricTests(unittest.TestCase):
         self.assertEqual(metrics["no_hit_accuracy"], 0.5)
         self.assertEqual(metrics["false_positive_rate"], 0.5)
         self.assertIsNone(metrics["hit_at_1"])
+        self.assertIsNone(metrics["precision_at_3"])
 
     def test_missing_fact_topic_hit_is_not_counted_as_retrieval_false_positive(self) -> None:
         no_hit = self._result(
@@ -166,7 +192,14 @@ class EvaluationRunnerTests(unittest.TestCase):
             overall = run.summaries[strategy]["overall"]
             self.assertIn("hit_at_3", overall)
             self.assertIn("recall_at_3", overall)
+            self.assertIn("precision_at_3", overall)
             self.assertIn("false_positive_rate", overall)
+
+    def test_metric_k_cannot_exceed_the_retrieved_top_k(self) -> None:
+        case = next(case for case in self.cases if case.case_id == "pos-card-loss-001")
+
+        with self.assertRaisesRegex(ValueError, "metric_k 不能大于"):
+            EvaluationRunner().run((case,), strategies=("bm25",), metric_k=4)
 
     def test_agentic_case_records_bounded_trace(self) -> None:
         case = next(
@@ -346,7 +379,14 @@ class EvaluationRunnerTests(unittest.TestCase):
             self.assertEqual(set(paths), {"summary", "markdown", "results", "failures"})
             summary = json.loads(paths["summary"].read_text(encoding="utf-8"))
             self.assertEqual(summary["case_count"], 2)
-            self.assertEqual(summary["schema_version"], "1.2")
+            self.assertEqual(summary["schema_version"], "1.3")
+            self.assertEqual(
+                summary["evaluation_methods"]["retrieval"], "annotated_chunk_ids"
+            )
+            self.assertEqual(
+                summary["evaluation_methods"]["ragas_faithfulness"],
+                "not_evaluated",
+            )
             self.assertIn("configuration_fingerprint", summary)
             self.assertIn("corpus_fingerprint", summary)
             self.assertIn("dataset_fingerprint", summary)
