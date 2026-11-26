@@ -1,4 +1,4 @@
-"""检索与 Agentic RAG 指标；Hit 与 Recall 使用不同分母。"""
+"""基于标注 Chunk ID 的检索指标，以及确定性 Agentic RAG 检查。"""
 
 from __future__ import annotations
 
@@ -138,6 +138,7 @@ def aggregate_metrics(
     reciprocal_rank_total = 0.0
     relevant_retrieved = 0
     relevant_total = 0
+    retrieved_for_positives = 0
     for result in positives:
         expected_chunks = set(result.expected_chunk_ids)
         expected_documents = set(result.expected_document_ids)
@@ -156,6 +157,7 @@ def aggregate_metrics(
             document_hit_at_k += 1
         relevant_retrieved += len(expected_chunks & set(retrieved_at_k))
         relevant_total += len(expected_chunks)
+        retrieved_for_positives += len(retrieved_at_k)
 
     false_positive_count = sum(
         bool(result.retrieved_chunk_ids) for result in no_hit_cases
@@ -189,6 +191,9 @@ def aggregate_metrics(
         f"hit_at_{k}": _ratio(hit_at_k, len(positives)),
         f"document_hit_at_{k}": _ratio(document_hit_at_k, len(positives)),
         f"recall_at_{k}": _ratio(relevant_retrieved, relevant_total),
+        # 与 Recall@K 一样使用人工标注的 Chunk ID；只统计可回答正例。
+        # 负例单独由 No-hit/FPR 与安全拒答指标评价。
+        f"precision_at_{k}": _ratio(relevant_retrieved, retrieved_for_positives),
         f"mrr_at_{k}": _ratio(reciprocal_rank_total, len(positives)),
         "no_hit_accuracy": _ratio(no_hit_count, len(no_hit_cases)),
         "false_positive_rate": _ratio(false_positive_count, len(no_hit_cases)),

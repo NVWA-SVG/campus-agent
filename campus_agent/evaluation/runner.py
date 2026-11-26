@@ -61,7 +61,13 @@ class EvaluationRun:
 
     def as_dict(self, *, include_results: bool = True) -> dict[str, object]:
         value: dict[str, object] = {
-            "schema_version": "1.2",
+            "schema_version": "1.3",
+            "evaluation_methods": {
+                "retrieval": "annotated_chunk_ids",
+                "generation": "partial_deterministic_checks",
+                "ragas_faithfulness": "not_evaluated",
+                "ragas_answer_relevancy": "not_evaluated",
+            },
             "generated_at": self.generated_at,
             "embedding_provider": self.embedding_provider,
             "embedding_model": self.embedding_model,
@@ -115,6 +121,8 @@ class EvaluationRunner:
         )
         if not selected_cases:
             raise ValueError("筛选后没有可运行的评测用例")
+        if any(case.request.top_k < metric_k for case in selected_cases):
+            raise ValueError("metric_k 不能大于评测用例的 request.top_k")
         if validate:
             validate_dataset(selected_cases, self.rag.chunks)
 
